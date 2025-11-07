@@ -72,7 +72,7 @@ func handleExecute(w http.ResponseWriter, r *http.Request) {
 	slog.Debug("execution results", slog.Any("result", result))
 
 	response := ducktape.ExecuteResponse{
-		RowsAffected: rowsAffected,
+		RowsAffectedCount: rowsAffected,
 	}
 	body, err := json.Marshal(response)
 	if err != nil {

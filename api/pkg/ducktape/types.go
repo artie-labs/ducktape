@@ -27,8 +27,16 @@ type ExecuteRequest struct {
 }
 
 type ExecuteResponse struct {
-	RowsAffected int64   `json:"rowsAffected"`
-	Error        *string `json:"error"`
+	RowsAffectedCount int64   `json:"rowsAffected"`
+	Error             *string `json:"error"`
+}
+
+func (r ExecuteResponse) LastInsertId() int64 {
+	return 0
+}
+
+func (r ExecuteResponse) RowsAffected() int64 {
+	return r.RowsAffectedCount
 }
 
 type RowMesssage struct {
