@@ -5,10 +5,12 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
-	"golang.org/x/net/http2"
 	"io"
+	"iter"
 	"net"
 	"net/http"
+
+	"golang.org/x/net/http2"
 )
 
 type Client struct {
@@ -101,7 +103,8 @@ func (c *Client) Append(
 	database string,
 	schema string,
 	table string,
-	streamFunc func(w io.Writer) error,
+	streamIterator iter.Seq[RowMessageResult],
+	marshalFunc func(r RowMessage) ([]byte, error),
 	unmarshalFunc func(r []byte) (*AppendResponse, error),
 ) (*AppendResponse, error) {
 	url := fmt.Sprintf("%s%s", c.baseURL, AppendRoute)
@@ -119,8 +122,23 @@ func (c *Client) Append(
 	pr, pw := io.Pipe()
 
 	go func() {
-		err := streamFunc(pw)
-		pw.CloseWithError(err)
+		for rowMessageResult := range streamIterator {
+			if rowMessageResult.Error != nil {
+				pw.CloseWithError(fmt.Errorf("error in row message result: %s", *rowMessageResult.Error))
+				return
+			}
+			bytes, err := marshalFunc(rowMessageResult.Row)
+			if err != nil {
+				pw.CloseWithError(err)
+				return
+			}
+			_, err = pw.Write(append(bytes, '\n'))
+			if err != nil {
+				pw.CloseWithError(err)
+				return
+			}
+		}
+		pw.Close()
 	}()
 
 	req.Body = pr

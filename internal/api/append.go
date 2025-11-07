@@ -118,7 +118,7 @@ func handleAppend(w http.ResponseWriter, r *http.Request) {
 
 		bytesRead += uint64(len(line))
 
-		var rowMsg ducktape.RowMesssage
+		var rowMsg ducktape.RowMessage
 		if err := json.Unmarshal(line, &rowMsg); err != nil {
 			err := fmt.Errorf("failed to unmarshal row message: %v", err)
 			errMsg := err.Error()

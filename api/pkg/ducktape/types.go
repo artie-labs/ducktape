@@ -39,8 +39,13 @@ func (r ExecuteResponse) RowsAffected() (int64, error) {
 	return r.RowsAffectedCount, nil
 }
 
-type RowMesssage struct {
+type RowMessage struct {
 	Values []any `json:"rv"`
+}
+
+type RowMessageResult struct {
+	Row   RowMessage `json:"row"`
+	Error *string    `json:"error"`
 }
 
 type AppendResponse struct {
