@@ -1,0 +1,12 @@
+dist/*
+
+.envrc-personal
+.envrc-*
+
+.personal/
+
+scratch/
+
+# Go workspace file
+go.work
+go.work.sum
