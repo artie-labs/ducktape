@@ -31,12 +31,12 @@ type ExecuteResponse struct {
 	Error             *string `json:"error"`
 }
 
-func (r ExecuteResponse) LastInsertId() int64 {
-	return 0
+func (r ExecuteResponse) LastInsertId() (int64, error) {
+	return 0, nil
 }
 
-func (r ExecuteResponse) RowsAffected() int64 {
-	return r.RowsAffectedCount
+func (r ExecuteResponse) RowsAffected() (int64, error) {
+	return r.RowsAffectedCount, nil
 }
 
 type RowMesssage struct {
