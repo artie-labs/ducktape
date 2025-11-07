@@ -2,6 +2,9 @@
 
 **The quack-tacular HTTP API for DuckDB that'll get your data ducks in a row!**
 
+
+<img align="center" style="width:100%;" alt="Artie Ducktape" src="https://github.com/user-attachments/assets/49fc011e-539b-4427-a9fa-1cdd1faaef20" />
+
 ## What the Duck?
 
 Ducktape is a feather-light HTTP server that lets you interact with DuckDB without getting your webbed feet wet. No more waddling through complicated database setups—just fire up the server and start quacking... er, querying!
@@ -98,7 +101,7 @@ If you get "OK", your duck's in good shape!
 
 ## License
 
-Artie Transfer is licensed under ELv2. Please see the [LICENSE](https://github.com/artie-labs/ducktape/blob/master/LICENSE.txt) file for additional information. If you have any licensing questions please email hi@artie.com.
+Artie Ducktape is licensed under ELv2. Please see the [LICENSE](https://github.com/artie-labs/ducktape/blob/master/LICENSE.txt) file for additional information. If you have any licensing questions please email hi@artie.com.
 
 ---
 
