@@ -9,3 +9,11 @@ start:
 .PHONY: debug
 debug:
 	DUCKTAPE_LOG=debug go run cmd/main.go
+
+.PHONY: test
+test:
+	go test -count 1 ./...
+
+.PHONY: bench
+bench:
+	go test -bench=. ./... -benchmem

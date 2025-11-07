@@ -3,6 +3,7 @@ package api
 import (
 	"bufio"
 	"cmp"
+	"context"
 	"database/sql"
 	"database/sql/driver"
 	"fmt"
@@ -55,124 +56,8 @@ func handleAppend(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 
-	db, err := sql.Open("duckdb", dsn)
+	rowsAppended, bytesRead, err := Append(ctx, dsn, database, schema, table, r.Body)
 	if err != nil {
-		err := fmt.Errorf("failed to start a SQL client for driver %q: %v", "duckdb", err)
-		errMsg := err.Error()
-		handleBadRequestJSON(w, ducktape.AppendResponse{Error: &errMsg}, err)
-		return
-	}
-	defer db.Close()
-
-	if err = db.Ping(); err != nil {
-		err := fmt.Errorf("failed to validate the DB connection for driver %q: %v", "duckdb", err)
-		errMsg := err.Error()
-		handleInternalServerErrorJSON(w, ducktape.AppendResponse{Error: &errMsg}, err)
-		return
-	}
-
-	conn, err := db.Conn(ctx)
-	if err != nil {
-		err := fmt.Errorf("failed to get a connection: %v", err)
-		errMsg := err.Error()
-		handleInternalServerErrorJSON(w, ducktape.AppendResponse{Error: &errMsg}, err)
-		return
-	}
-	defer conn.Close()
-
-	columnMetadata, err := utils.GetColumnMetadata(ctx, conn, database, schema, table)
-	if err != nil {
-		err := fmt.Errorf("failed to get column metadata: %v", err)
-		errMsg := err.Error()
-		handleInternalServerErrorJSON(w, ducktape.AppendResponse{Error: &errMsg}, err)
-		return
-	}
-
-	var appender *duckdb.Appender
-	err = conn.Raw(func(driverConn any) error {
-		var appErr error
-		appender, appErr = duckdb.NewAppender(driverConn.(driver.Conn), database, schema, table)
-		if appErr != nil {
-			return appErr
-		}
-		return nil
-	})
-	if err != nil {
-		err := fmt.Errorf("failed to create an appender: %v", err)
-		errMsg := err.Error()
-		handleInternalServerErrorJSON(w, ducktape.AppendResponse{Error: &errMsg}, err)
-		return
-	}
-	defer appender.Close()
-
-	// Stream NDJSON from request body
-	scanner := bufio.NewScanner(r.Body)
-	var rowsAppended int64
-	var bytesRead uint64
-
-	for scanner.Scan() {
-		line := scanner.Bytes()
-		if len(line) == 0 {
-			continue // Skip empty lines
-		}
-
-		bytesRead += uint64(len(line))
-
-		var rowMsg ducktape.RowMessage
-		if err := json.Unmarshal(line, &rowMsg); err != nil {
-			err := fmt.Errorf("failed to unmarshal row message: %v", err)
-			errMsg := err.Error()
-			handleBadRequestJSON(w, ducktape.AppendResponse{Error: &errMsg}, err)
-			return
-		}
-
-		values := make([]driver.Value, len(rowMsg.Values))
-		for i, v := range rowMsg.Values {
-			if i >= len(columnMetadata) {
-				err := fmt.Errorf("value index %d exceeds number of columns %d", i, len(columnMetadata))
-				errMsg := err.Error()
-				handleInternalServerErrorJSON(w, ducktape.AppendResponse{Error: &errMsg}, err)
-				return
-			}
-			convertedValue, err := utils.ConvertValue(v, columnMetadata[i])
-			if err != nil {
-				err := fmt.Errorf("failed to convert value: %w", err)
-				errMsg := err.Error()
-				handleInternalServerErrorJSON(w, ducktape.AppendResponse{Error: &errMsg}, err)
-				return
-			}
-			values[i] = convertedValue
-		}
-
-		if err := appender.AppendRow(values...); err != nil {
-			err := fmt.Errorf("failed to append row: %v", err)
-			errMsg := err.Error()
-			handleInternalServerErrorJSON(w, ducktape.AppendResponse{Error: &errMsg}, err)
-			return
-		}
-
-		rowsAppended++
-
-		if rowsAppended%flushInterval == 0 {
-			slog.Info("flushing appender", slog.Int64("rowsAppended", rowsAppended), slog.Uint64("bytesRead", bytesRead))
-			if err := appender.Flush(); err != nil {
-				err := fmt.Errorf("failed to flush appender: %v", err)
-				errMsg := err.Error()
-				handleInternalServerErrorJSON(w, ducktape.AppendResponse{Error: &errMsg}, err)
-				return
-			}
-		}
-	}
-
-	if err := scanner.Err(); err != nil && err != io.EOF {
-		err := fmt.Errorf("error reading request stream: %v", err)
-		errMsg := err.Error()
-		handleInternalServerErrorJSON(w, ducktape.AppendResponse{Error: &errMsg}, err)
-		return
-	}
-
-	if err := appender.Flush(); err != nil {
-		err := fmt.Errorf("failed to flush appender: %v", err)
 		errMsg := err.Error()
 		handleInternalServerErrorJSON(w, ducktape.AppendResponse{Error: &errMsg}, err)
 		return
@@ -193,4 +78,93 @@ func handleAppend(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	w.Write(body)
 	slog.Info(fmt.Sprintf("append complete for table %s.%s.%s", database, schema, table), slog.Int64("totalRowsAppended", rowsAppended), slog.Uint64("totalBytesRead", bytesRead), slog.Duration("elapsed", time.Since(start)))
+}
+
+func Append(ctx context.Context, dsn string, database string, schema string, table string, input io.Reader) (rowsAppended int64, bytesRead uint64, err error) {
+	db, err := sql.Open("duckdb", dsn)
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to start a SQL client for append(%q): %w", "duckdb", err)
+	}
+	defer db.Close()
+
+	if err = db.Ping(); err != nil {
+		return 0, 0, fmt.Errorf("failed to validate the DB connection for append(%q): %w", "duckdb", err)
+	}
+
+	conn, err := db.Conn(ctx)
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to get a connection for append(%q): %w", "duckdb", err)
+	}
+	defer conn.Close()
+
+	columnMetadata, err := utils.GetColumnMetadata(ctx, conn, database, schema, table)
+	if err != nil {	
+		return 0, 0, fmt.Errorf("failed to get column metadata for append(%q): %w", "duckdb", err)
+	}
+
+	var appender *duckdb.Appender
+	err = conn.Raw(func(driverConn any) error {
+		var appErr error
+		appender, appErr = duckdb.NewAppender(driverConn.(driver.Conn), database, schema, table)
+		if appErr != nil {
+			return appErr
+		}
+		return nil
+	})
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to create an appender(%q): %w", "duckdb", err)
+	}
+	defer appender.Close()
+
+	// Stream NDJSON from request body
+	scanner := bufio.NewScanner(input)
+
+	for scanner.Scan() {
+		line := scanner.Bytes()
+		if len(line) == 0 {
+			continue // Skip empty lines
+		}
+
+		bytesRead += uint64(len(line))
+
+		var rowMsg ducktape.RowMessage
+		if err := json.Unmarshal(line, &rowMsg); err != nil {
+			return 0, 0, fmt.Errorf("failed to unmarshal row message: %w", err)
+		}
+
+		values := make([]driver.Value, len(rowMsg.Values))
+		for i, v := range rowMsg.Values {
+			if i >= len(columnMetadata) {
+				return 0, 0, fmt.Errorf("value index %d exceeds number of columns %d", i, len(columnMetadata))
+			}
+			convertedValue, err := utils.ConvertValue(v, columnMetadata[i])
+			if err != nil {
+				return 0, 0, fmt.Errorf("failed to convert value while appending: %w", err)
+			}
+			values[i] = convertedValue
+		}
+
+		if err := appender.AppendRow(values...); err != nil {
+			return 0, 0, fmt.Errorf("failed to append row: %w", err)
+		}
+
+		rowsAppended++
+
+		if rowsAppended%flushInterval == 0 {
+			slog.Info("flushing appender", slog.Int64("rowsAppended", rowsAppended), slog.Uint64("bytesRead", bytesRead))
+			if err := appender.Flush(); err != nil {
+				return 0, 0, fmt.Errorf("failed to flush appender: %w", err)
+			}
+		}
+	}
+
+	if err := scanner.Err(); err != nil && err != io.EOF {
+		return 0, 0, fmt.Errorf("failed to read request stream: %w", err)
+	}
+
+	if err := appender.Flush(); err != nil {
+		return 0, 0, fmt.Errorf("failed to flush appender: %w", err)
+	}
+
+	return rowsAppended, bytesRead, nil
 }
