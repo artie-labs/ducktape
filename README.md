@@ -1,4 +1,4 @@
-# 🦆 Ducktape
+# 🐘 Artie Ducktape 🦆
 
 **The quack-tacular HTTP API for DuckDB that'll get your data ducks in a row!**
 
@@ -101,7 +101,7 @@ If you get "OK", your duck's in good shape!
 
 ## License
 
-Artie Ducktape is licensed under ELv2. Please see the [LICENSE](https://github.com/artie-labs/ducktape/blob/master/LICENSE.txt) file for additional information. If you have any licensing questions please email hi@artie.com.
+Artie Ducktape is licensed under the MIT license. Please see the [LICENSE](https://github.com/artie-labs/ducktape/blob/master/LICENSE.txt) file for additional information. If you have any licensing questions please email hi@artie.com.
 
 ---
 
