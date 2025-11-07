@@ -7,8 +7,6 @@ import (
 	"net/http"
 
 	jsoniter "github.com/json-iterator/go"
-	"golang.org/x/net/http2"
-	"golang.org/x/net/http2/h2c"
 
 	"github.com/artie-labs/ducktape/api/pkg/ducktape"
 )
@@ -25,10 +23,7 @@ func RegisterHealthCheckRoutes(mux *http.ServeMux) {
 func RegisterApiRoutes(mux *http.ServeMux) {
 	mux.HandleFunc(fmt.Sprintf("POST %s", ducktape.ExecuteRoute), handleExecute)
 	mux.HandleFunc(fmt.Sprintf("POST %s", ducktape.QueryRoute), handleQuery)
-
-	// Wrap the append handler with h2c to support HTTP/2 cleartext
-	h2cHandler := h2c.NewHandler(http.HandlerFunc(handleAppend), &http2.Server{})
-	mux.Handle(fmt.Sprintf("POST %s", ducktape.AppendRoute), h2cHandler)
+	mux.HandleFunc(fmt.Sprintf("POST %s", ducktape.AppendRoute), handleAppend)
 }
 
 func getRequestBody[T any](r *http.Request) (T, error) {

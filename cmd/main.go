@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	"github.com/artie-labs/ducktape/internal/api"
+	"golang.org/x/net/http2"
+	"golang.org/x/net/http2/h2c"
 )
 
 func main() {
@@ -43,6 +45,9 @@ func main() {
 		port = "8080"
 	}
 
+	// Wrap the mux with h2c to support both HTTP/1.1 and HTTP/2
+	h2cHandler := h2c.NewHandler(mux, &http2.Server{})
+
 	log.Printf("Starting server on port %s\n", port)
-	log.Fatal(http.ListenAndServe("0.0.0.0:"+port, mux))
+	log.Fatal(http.ListenAndServe("0.0.0.0:"+port, h2cHandler))
 }
