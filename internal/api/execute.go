@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/artie-labs/ducktape/api/pkg/ducktape"
 	_ "github.com/duckdb/duckdb-go/v2"
 )
 
 func handleExecute(w http.ResponseWriter, r *http.Request) {
+	start := time.Now()
 	dsn := r.Header.Get(ducktape.DuckDBConnectionStringHeader)
 	if dsn == "" {
 		err := fmt.Errorf("%q header is required", ducktape.DuckDBConnectionStringHeader)
@@ -69,8 +71,6 @@ func handleExecute(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	slog.Debug("execution results", slog.Any("result", result))
-
 	response := ducktape.ExecuteResponse{
 		RowsAffectedCount: rowsAffected,
 	}
@@ -83,4 +83,5 @@ func handleExecute(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	w.Write(body)
+	slog.Debug("execution results", slog.Any("rows affected", rowsAffected), slog.Duration("elapsed", time.Since(start)))
 }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/artie-labs/ducktape/api/pkg/ducktape"
 	"github.com/artie-labs/ducktape/internal/utils"
@@ -12,6 +13,7 @@ import (
 )
 
 func handleQuery(w http.ResponseWriter, r *http.Request) {
+	start := time.Now()
 	dsn := r.Header.Get(ducktape.DuckDBConnectionStringHeader)
 	if dsn == "" {
 		err := fmt.Errorf("%q header is required", ducktape.DuckDBConnectionStringHeader)
@@ -72,8 +74,6 @@ func handleQuery(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	slog.Debug("query results", slog.Any("rows", objects))
-
 	response := ducktape.QueryResponse{
 		Rows: objects,
 	}
@@ -87,4 +87,5 @@ func handleQuery(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	w.Write(body)
+	slog.Debug("query results", slog.Any("rows", objects), slog.Duration("elapsed", time.Since(start)))
 }
