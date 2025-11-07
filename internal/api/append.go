@@ -9,14 +9,17 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/artie-labs/ducktape/api/pkg/ducktape"
+	"github.com/artie-labs/ducktape/internal/utils"
 	"github.com/duckdb/duckdb-go/v2"
 )
 
 const flushInterval = 100_000
 
 func handleAppend(w http.ResponseWriter, r *http.Request) {
+	start := time.Now()
 	if r.ProtoMajor != 2 {
 		err := fmt.Errorf("HTTP/2 is required, got %s", r.Proto)
 		errMsg := err.Error()
@@ -77,6 +80,14 @@ func handleAppend(w http.ResponseWriter, r *http.Request) {
 	}
 	defer conn.Close()
 
+	columnMetadata, err := utils.GetColumnMetadata(ctx, conn, database, schema, table)
+	if err != nil {
+		err := fmt.Errorf("failed to get column metadata: %v", err)
+		errMsg := err.Error()
+		handleInternalServerErrorJSON(w, ducktape.AppendResponse{Error: &errMsg}, err)
+		return
+	}
+
 	var appender *duckdb.Appender
 	err = conn.Raw(func(driverConn any) error {
 		var appErr error
@@ -97,7 +108,7 @@ func handleAppend(w http.ResponseWriter, r *http.Request) {
 	// Stream NDJSON from request body
 	scanner := bufio.NewScanner(r.Body)
 	var rowsAppended int64
-	var bytesRead int64
+	var bytesRead uint64
 
 	for scanner.Scan() {
 		line := scanner.Bytes()
@@ -105,7 +116,7 @@ func handleAppend(w http.ResponseWriter, r *http.Request) {
 			continue // Skip empty lines
 		}
 
-		bytesRead += int64(len(line))
+		bytesRead += uint64(len(line))
 
 		var rowMsg ducktape.RowMesssage
 		if err := json.Unmarshal(line, &rowMsg); err != nil {
@@ -115,10 +126,22 @@ func handleAppend(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// Convert []any to []driver.Value
 		values := make([]driver.Value, len(rowMsg.Values))
 		for i, v := range rowMsg.Values {
-			values[i] = v
+			if i >= len(columnMetadata) {
+				err := fmt.Errorf("value index %d exceeds number of columns %d", i, len(columnMetadata))
+				errMsg := err.Error()
+				handleInternalServerErrorJSON(w, ducktape.AppendResponse{Error: &errMsg}, err)
+				return
+			}
+			convertedValue, err := utils.ConvertValue(v, columnMetadata[i])
+			if err != nil {
+				err := fmt.Errorf("failed to convert value: %w", err)
+				errMsg := err.Error()
+				handleInternalServerErrorJSON(w, ducktape.AppendResponse{Error: &errMsg}, err)
+				return
+			}
+			values[i] = convertedValue
 		}
 
 		if err := appender.AppendRow(values...); err != nil {
@@ -131,7 +154,7 @@ func handleAppend(w http.ResponseWriter, r *http.Request) {
 		rowsAppended++
 
 		if rowsAppended%flushInterval == 0 {
-			slog.Info("flushing appender", slog.Int64("rowsAppended", rowsAppended), slog.Int64("bytesRead", bytesRead))
+			slog.Info("flushing appender", slog.Int64("rowsAppended", rowsAppended), slog.Uint64("bytesRead", bytesRead))
 			if err := appender.Flush(); err != nil {
 				err := fmt.Errorf("failed to flush appender: %v", err)
 				errMsg := err.Error()
@@ -155,8 +178,6 @@ func handleAppend(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	slog.Info("append complete", slog.Int64("totalRowsAppended", rowsAppended), slog.Int64("totalBytesRead", bytesRead))
-
 	// Return success response
 	response := ducktape.AppendResponse{
 		RowsAppended: rowsAppended,
@@ -171,4 +192,5 @@ func handleAppend(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	w.Write(body)
+	slog.Info(fmt.Sprintf("append complete for table %s.%s.%s", database, schema, table), slog.Int64("totalRowsAppended", rowsAppended), slog.Uint64("totalBytesRead", bytesRead), slog.Duration("elapsed", time.Since(start)))
 }
