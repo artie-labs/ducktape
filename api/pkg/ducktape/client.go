@@ -27,7 +27,13 @@ func NewClient(baseURL string) *Client {
 	return &Client{baseURL: baseURL, httpClient: &http.Client{Transport: tr}}
 }
 
-func (c *Client) Execute(ctx context.Context, request ExecuteRequest, connectionString string, marshalFunc func(r ExecuteRequest) ([]byte, error), unmarshalFunc func(r []byte) (*ExecuteResponse, error)) (*ExecuteResponse, error) {
+func (c *Client) Execute(
+	ctx context.Context,
+	request ExecuteRequest,
+	connectionString string,
+	marshalFunc func(r ExecuteRequest) ([]byte, error),
+	unmarshalFunc func(r []byte) (*ExecuteResponse, error),
+) (*ExecuteResponse, error) {
 	url := fmt.Sprintf("%s%s", c.baseURL, ExecuteRoute)
 	body, err := marshalFunc(request)
 	if err != nil {
@@ -55,7 +61,13 @@ func (c *Client) Execute(ctx context.Context, request ExecuteRequest, connection
 	return unmarshalFunc(responseBody)
 }
 
-func (c *Client) Query(ctx context.Context, request QueryRequest, connectionString string, marshalFunc func(r QueryRequest) ([]byte, error), unmarshalFunc func(r []byte) (*QueryResponse, error)) (*QueryResponse, error) {
+func (c *Client) Query(
+	ctx context.Context,
+	request QueryRequest,
+	connectionString string,
+	marshalFunc func(r QueryRequest) ([]byte, error),
+	unmarshalFunc func(r []byte) (*QueryResponse, error),
+) (*QueryResponse, error) {
 	url := fmt.Sprintf("%s%s", c.baseURL, QueryRoute)
 	body, err := marshalFunc(request)
 	if err != nil {
@@ -83,7 +95,15 @@ func (c *Client) Query(ctx context.Context, request QueryRequest, connectionStri
 	return unmarshalFunc(responseBody)
 }
 
-func (c *Client) Append(ctx context.Context, connectionString string, database string, schema string, table string, streamFunc func(w io.Writer) error, unmarshalFunc func(r []byte) (*AppendResponse, error)) (*AppendResponse, error) {
+func (c *Client) Append(
+	ctx context.Context,
+	connectionString string,
+	database string,
+	schema string,
+	table string,
+	streamFunc func(w io.Writer) error,
+	unmarshalFunc func(r []byte) (*AppendResponse, error),
+) (*AppendResponse, error) {
 	url := fmt.Sprintf("%s%s", c.baseURL, AppendRoute)
 	req, err := http.NewRequestWithContext(ctx, "POST", url, nil)
 	if err != nil {
