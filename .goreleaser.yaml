@@ -1,0 +1,95 @@
+project_name: artie-ducktape
+
+version: 2
+
+before:
+  hooks:
+    # You may remove this if you don't use go modules.
+    - go mod tidy
+builds:
+  - main: ./cmd/main.go
+    binary: ducktape
+    env:
+      - CGO_ENABLED=1
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    overrides:
+      - goos: linux
+        goarch: amd64
+        env:
+          - CC=x86_64-linux-gnu-gcc
+          - CXX=x86_64-linux-gnu-g++
+      - goos: linux
+        goarch: arm64
+        env:
+          - CC=aarch64-linux-gnu-gcc
+          - CXX=aarch64-linux-gnu-g++
+      - goos: darwin
+        goarch: amd64
+        env:
+          - CC=o64-clang
+          - CXX=o64-clang++
+          - CGO_LDFLAGS=-mmacosx-version-min=14.0
+      - goos: darwin
+        goarch: arm64
+        env:
+          - CC=oa64-clang
+          - CXX=oa64-clang++
+          - CGO_LDFLAGS=-mmacosx-version-min=14.0
+
+dockers:
+  - image_templates:
+      - "artielabs/ducktape:latest"
+      - "artielabs/ducktape:{{ .Tag }}"
+    # You can have multiple Docker images.
+    # GOOS of the built binaries/packages that should be used.
+    # Default: `linux`.
+    goos: linux
+
+    # GOARCH of the built binaries/packages that should be used.
+    # Default: `amd64`.
+    goarch: amd64
+
+    # Skips the docker push.
+    skip_push: true
+
+    # Path to the Dockerfile (from the project root).
+    # Defaults to `Dockerfile`.
+    dockerfile: goreleaser.dockerfile
+
+    # Set the "backend" for the Docker pipe.
+    # Valid options are: docker, buildx, podman.
+    # Defaults to docker.
+    use: docker
+    build_flag_templates:
+      - "--pull"
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.title={{.ProjectName}}"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"
+      - "--platform=linux/amd64"
+
+archives:
+  - formats: tar.gz
+    # this name template makes the OS and Arch compatible with the results of uname.
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
+checksum:
+  name_template: 'checksums.txt'
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
