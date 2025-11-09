@@ -1,66 +1,67 @@
-# 🐘 Artie Ducktape 🦆
+<h1
+ align="center">
+ <img
+      align="center"
+      alt="Artie Transfer"
+      src="https://github.com/user-attachments/assets/d85de641-4245-4795-9863-cb5082ef3881"
+      style="width:100%;"
+    />
+</h1>
 
-**The quack-tacular HTTP API for DuckDB that'll get your data ducks in a row!**
+<div align="center">
+  <h3>Ducktape</h3>
+  <p>Lightweight REST API for DuckDB with HTTP/2 streaming support.</p>
+  <a href="https://artie.com/slack"><img src="https://img.shields.io/badge/slack-@artie-blue.svg?logo=slack"/></a>
+  <a href="https://github.com/artie-labs/duck/blob/master/LICENSE.txt"><img src="https://img.shields.io/badge/License-MIT-yellow.svg"/></a>
+</div>
 
+## Features
 
-<img align="center" style="width:100%;" alt="Artie Ducktape" src="https://github.com/user-attachments/assets/49fc011e-539b-4427-a9fa-1cdd1faaef20" />
+- **Execute**: Run DDL/DML queries that don't return results
+- **Query**: Fetch rows from DuckDB
+- **Append**: Stream data via HTTP/2 with NDJSON format
+- **Go Client**: Native Go client library included
 
-## What the Duck?
-
-Ducktape is a feather-light HTTP server that lets you interact with DuckDB without getting your webbed feet wet. No more waddling through complicated database setups—just fire up the server and start quacking... er, querying!
-
-## Features (Our Finest Plumage)
-
-- **Execute**: Make waves with queries that don't return data (DDL, DML)
-- **Query**: Dive deep and fetch rows from your data pond
-- **Append**: Stream data like a duck taking to water (with HTTP/2 support!)
-- **Go Client**: A mallard-ble client library that speaks fluent duck
-
-## Quack Start
-
-### Running the Server
-
-Don't be a sitting duck—get started in seconds:
+## Quick start
 
 ```bash
 make start
-# Or for debug logging (to see all the quacking under the hood)
+# Or with debug logging
 make debug
-# Or set your own PORT and log level
+# Or manually
 PORT=8080 DUCKTAPE_LOG=debug go run cmd/main.go
+
+# Health check
+curl http://localhost:8080/health
 ```
 
-The server will be paddling along on port 8080 by default. Duck yeah!
+Server runs on port 8080 by default.
 
-### Using the API
+## API usage
 
-#### Execute a Query (No results, just action!)
+### Execute
 
 ```bash
 curl -X POST http://localhost:8080/api/execute \
   -H "X-DuckDB-Connection-String: /path/to/duck.db" \
   -H "Content-Type: application/json" \
-  -d '{"query": "CREATE TABLE pond (duck_name TEXT)", "args": []}'
+  -d '{"query": "CREATE TABLE users (name TEXT)", "args": []}'
 ```
 
-#### Query Your Data Pond
+### Query
 
 ```bash
 curl -X POST http://localhost:8080/api/query \
   -H "X-DuckDB-Connection-String: /path/to/duck.db" \
   -H "Content-Type: application/json" \
-  -d '{"query": "SELECT * FROM pond WHERE duck_name = ?", "args": ["Donald"]}'
+  -d '{"query": "SELECT * FROM users WHERE name = ?", "args": ["Alice"]}'
 ```
 
-#### Append Data (Streaming like a pro)
+### Append
 
-Stream your data in NDJSON (Newline Delimited JSON) format over HTTP/2—each line is a `RowMessage` with a `rv` (row values) array. This lets you pipe massive datasets without ruffling any feathers. Use the Go client for this one, it's ducky!
+Streams NDJSON data over HTTP/2. Each line is a `RowMessage` with a `rv` (row values) array. Use the Go client for streaming large datasets.
 
-## The Flock (Go Client)
-
-## Installation
-
-You can fetch the latest version of Ducktape with Go modules:
+## Go client
 
 ```bash
 go get github.com/artie-labs/ducktape/api
@@ -70,39 +71,14 @@ go get github.com/artie-labs/ducktape/api
 import "github.com/artie-labs/ducktape/api/pkg/ducktape"
 
 client := ducktape.NewClient("http://localhost:8080")
-
-// Execute, query, and append to your heart's content!
-// This client won't leave you feeling like a lame duck.
 ```
 
-## Environment Variables
+## Configuration
 
-- `PORT`: Where the server nests (default: `8080`)
-- `DUCKTAPE_LOG`: Log level—`debug`, `info`, `warn`, or `error`
+- `PORT`: Server port (default: `8080`)
+- `DUCKTAPE_LOG`: Log level (`debug`, `info`, `warn`, `error`)
 
-## Why Ducktape?
-
-Because when you need to stick data together, nothing beats ducktape! It's the only tool that:
-
-- Doesn't quack under pressure
-- Makes data migration a breeze (no migration pun intended... wait, that's geese)
-- Keeps your database connections from going south for the winter
-- Is absolutely un-bird-lievable
-
-## Health Check
-
-Make sure your duck is still alive and quacking:
-
-```bash
-curl http://localhost:8080/health
-```
-
-If you get "OK", your duck's in good shape!
 
 ## License
 
-Artie Ducktape is licensed under the MIT license. Please see the [LICENSE](https://github.com/artie-labs/ducktape/blob/master/LICENSE.txt) file for additional information. If you have any licensing questions please email hi@artie.com.
-
----
-
-_Built with love by the fine fowl at [Artie Labs](https://www.artie.com/). No ducks were harmed in the making of this API._
+MIT License. See [LICENSE](https://github.com/artie-labs/ducktape/blob/master/LICENSE.txt) for details.
