@@ -24,6 +24,20 @@
 
 ## Quick start
 
+### Docker
+```bash
+docker run -e DUCKTAPE_LOG="debug" --rm --publish 8080:8080 --volume $PWD:/data artielabs/ducktape:latest
+
+curl -X POST 'http://localhost:8080/api/query' \
+--header 'X-DuckDB-Connection-String: data/test.db' \
+--header 'Content-Type: application/json' \
+--data '{
+    "Query": "CREATE TABLE test_file (id BIGINT);"
+}'
+# test.db will be created in your current working directory
+```
+
+### Development
 ```bash
 make start
 # Or with debug logging
