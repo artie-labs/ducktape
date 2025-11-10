@@ -7,7 +7,8 @@ before:
     # You may remove this if you don't use go modules.
     - go mod tidy
 builds:
-  - main: ./cmd/main.go
+  - id: ducktape
+    main: ./cmd/main.go
     binary: ducktape
     env:
       - CGO_ENABLED=1
@@ -42,9 +43,11 @@ builds:
           - CGO_LDFLAGS=-mmacosx-version-min=14.0
 
 dockers:
-  - image_templates:
-      - "artielabs/ducktape:latest"
-      - "artielabs/ducktape:{{ .Tag }}"
+  - ids:
+      - ducktape
+    image_templates:
+      - "artielabs/ducktape:latest-amd64"
+      - "artielabs/ducktape:{{ .Tag }}-amd64"
     # You can have multiple Docker images.
     # GOOS of the built binaries/packages that should be used.
     # Default: `linux`.
@@ -73,6 +76,36 @@ dockers:
       - "--label=org.opencontainers.image.version={{.Version}}"
       - "--platform=linux/amd64"
 
+  - ids:
+      - ducktape
+    image_templates:
+      - "artielabs/ducktape:latest-arm64"
+      - "artielabs/ducktape:{{ .Tag }}-arm64"
+    goos: linux
+    goarch: arm64
+    skip_push: true
+    dockerfile: goreleaser.dockerfile
+    use: docker
+    build_flag_templates:
+      - "--pull"
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.title={{.ProjectName}}"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"
+      - "--platform=linux/arm64"
+
+docker_manifests:
+  - name_template: "artielabs/ducktape:latest"
+    image_templates:
+      - "artielabs/ducktape:latest-amd64"
+      - "artielabs/ducktape:latest-arm64"
+    skip_push: true
+  - name_template: "artielabs/ducktape:{{ .Tag }}"
+    image_templates:
+      - "artielabs/ducktape:{{ .Tag }}-amd64"
+      - "artielabs/ducktape:{{ .Tag }}-arm64"
+    skip_push: true
+
 archives:
   - formats: tar.gz
     # this name template makes the OS and Arch compatible with the results of uname.
@@ -84,12 +117,12 @@ archives:
       {{- else }}{{ .Arch }}{{ end }}
       {{- if .Arm }}v{{ .Arm }}{{ end }}
 checksum:
-  name_template: 'checksums.txt'
+  name_template: "checksums.txt"
 snapshot:
   version_template: "{{ incpatch .Version }}-next"
 changelog:
   sort: asc
   filters:
     exclude:
-      - '^docs:'
-      - '^test:'
+      - "^docs:"
+      - "^test:"

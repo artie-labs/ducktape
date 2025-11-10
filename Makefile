@@ -27,6 +27,18 @@ build:
 		-e CGO_ENABLED=1 \
 		goreleaser/goreleaser-cross:latest build --clean
 
+.PHONY: build-images
+build-images:
+	docker run --rm --privileged \
+		-v $(PWD):/go/src/github.com/artie-labs/ducktape \
+		-v /var/run/docker.sock:/var/run/docker.sock \
+		-w /go/src/github.com/artie-labs/ducktape \
+		-e CGO_ENABLED=1 \
+		goreleaser/goreleaser-cross:latest release --snapshot --clean
+	@echo "Docker images built successfully!"
+	@echo "Available images:"
+	@docker images | grep ducktape | head -10
+
 .PHONY: release
 release:
 	docker run --rm --privileged \
