@@ -1,4 +1,3 @@
-FROM alpine:3.22
-RUN apk add --no-cache tzdata
+FROM gcr.io/distroless/cc-debian13
 COPY ducktape /ducktape
 ENTRYPOINT ["/ducktape"]
