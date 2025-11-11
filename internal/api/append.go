@@ -17,7 +17,10 @@ import (
 	"github.com/duckdb/duckdb-go/v2"
 )
 
-const flushInterval = 100_000
+const (
+	flushInterval   = 100_000
+	flushBytesLimit = 3 * 1024 * 1024 // 3MB - flush before reaching DuckDB's 4MB limit
+)
 
 func handleAppend(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
@@ -98,7 +101,7 @@ func Append(ctx context.Context, dsn string, database string, schema string, tab
 	defer conn.Close()
 
 	columnMetadata, err := utils.GetColumnMetadata(ctx, conn, database, schema, table)
-	if err != nil {	
+	if err != nil {
 		return 0, 0, fmt.Errorf("failed to get column metadata for append(%q): %w", "duckdb", err)
 	}
 
@@ -118,6 +121,7 @@ func Append(ctx context.Context, dsn string, database string, schema string, tab
 
 	// Stream NDJSON from request body
 	scanner := bufio.NewScanner(input)
+	var bytesSinceFlush uint64
 
 	for scanner.Scan() {
 		line := scanner.Bytes()
@@ -125,7 +129,9 @@ func Append(ctx context.Context, dsn string, database string, schema string, tab
 			continue // Skip empty lines
 		}
 
-		bytesRead += uint64(len(line))
+		lineBytes := uint64(len(line))
+		bytesRead += lineBytes
+		bytesSinceFlush += lineBytes
 
 		var rowMsg ducktape.RowMessage
 		if err := json.Unmarshal(line, &rowMsg); err != nil {
@@ -150,11 +156,13 @@ func Append(ctx context.Context, dsn string, database string, schema string, tab
 
 		rowsAppended++
 
-		if rowsAppended%flushInterval == 0 {
-			slog.Info("flushing appender", slog.Int64("rowsAppended", rowsAppended), slog.Uint64("bytesRead", bytesRead))
+		// Flush if we've reached row limit OR bytes limit
+		if rowsAppended%flushInterval == 0 || bytesSinceFlush >= flushBytesLimit {
+			slog.Info("flushing appender", slog.Int64("rowsAppended", rowsAppended), slog.Uint64("bytesRead", bytesRead), slog.Uint64("bytesSinceFlush", bytesSinceFlush))
 			if err := appender.Flush(); err != nil {
 				return 0, 0, fmt.Errorf("failed to flush appender: %w", err)
 			}
+			bytesSinceFlush = 0 // Reset counter after flush
 		}
 	}
 
