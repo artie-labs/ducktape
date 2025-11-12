@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/artie-labs/ducktape/internal/api"
+	"github.com/artie-labs/ducktape/internal/logging"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
 )
@@ -29,10 +30,19 @@ func main() {
 		level = slog.LevelInfo
 	}
 
-	handler := slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
-		Level: level,
+	infoHandler := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+		Level: slog.LevelDebug, // Don't filter here, we'll filter in the custom handler
 	})
-	logger := slog.New(handler)
+
+	errorHandler := slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
+		Level: slog.LevelDebug, // Don't filter here, we'll filter in the custom handler
+	})
+
+	logger := slog.New(&logging.SplitHandler{
+		Level:        level,
+		InfoHandler:  infoHandler,
+		ErrorHandler: errorHandler,
+	})
 	slog.SetDefault(logger)
 
 	mux := http.NewServeMux()
