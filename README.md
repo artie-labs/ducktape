@@ -25,7 +25,9 @@
 ## Quick start
 
 ### Docker
+
 ```bash
+docker pull artielabs/ducktape:latest
 docker run -e DUCKTAPE_LOG="debug" --rm --publish 8080:8080 --volume $PWD:/data artielabs/ducktape:latest
 
 curl -X POST 'http://localhost:8080/api/query' \
@@ -38,6 +40,7 @@ curl -X POST 'http://localhost:8080/api/query' \
 ```
 
 ### Development
+
 ```bash
 make start
 # Or with debug logging
@@ -55,18 +58,24 @@ Server runs on port 8080 by default.
 
 ### Execute
 
+Execute one or more SQL statements in a transaction:
+
 ```bash
 curl -X POST http://localhost:8080/api/execute \
-  -H "X-DuckDB-Connection-String: /path/to/duck.db" \
+  -H "X-DuckDB-Connection-String: duck.db" \
   -H "Content-Type: application/json" \
-  -d '{"query": "CREATE TABLE users (name TEXT)", "args": []}'
+  -d '{"statements": [
+    {"query": "CREATE TABLE users (name TEXT, age INTEGER)"},
+    {"query": "INSERT INTO users VALUES (?, ?)", "args": ["Alice", 30]},
+    {"query": "INSERT INTO users VALUES (?, ?)", "args": ["Bob", 25]}
+  ]}'
 ```
 
 ### Query
 
 ```bash
 curl -X POST http://localhost:8080/api/query \
-  -H "X-DuckDB-Connection-String: /path/to/duck.db" \
+  -H "X-DuckDB-Connection-String: duck.db" \
   -H "Content-Type: application/json" \
   -d '{"query": "SELECT * FROM users WHERE name = ?", "args": ["Alice"]}'
 ```
@@ -91,7 +100,6 @@ client := ducktape.NewClient("http://localhost:8080")
 
 - `PORT`: Server port (default: `8080`)
 - `DUCKTAPE_LOG`: Log level (`debug`, `info`, `warn`, `error`)
-
 
 ## License
 

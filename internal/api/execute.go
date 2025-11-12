@@ -33,7 +33,7 @@ func handleExecute(w http.ResponseWriter, r *http.Request) {
 	result, err := Execute(ctx, dsn, request)
 	if err != nil {
 		errMsg := err.Error()
-		handleInternalServerErrorJSON(w, ducktape.QueryResponse{Error: &errMsg}, err)
+		handleInternalServerErrorJSON(w, ducktape.ExecuteResponse{Error: &errMsg}, err)
 		return
 	}
 
@@ -41,7 +41,7 @@ func handleExecute(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		err := fmt.Errorf("failed to get the rows affected: %v", err)
 		errMsg := err.Error()
-		handleInternalServerErrorJSON(w, ducktape.QueryResponse{Error: &errMsg}, err)
+		handleInternalServerErrorJSON(w, ducktape.ExecuteResponse{Error: &errMsg}, err)
 		return
 	}
 
@@ -52,7 +52,7 @@ func handleExecute(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		err := fmt.Errorf("failed to marshal the response: %v", err)
 		errMsg := err.Error()
-		handleInternalServerErrorJSON(w, ducktape.QueryResponse{Error: &errMsg}, err)
+		handleInternalServerErrorJSON(w, ducktape.ExecuteResponse{Error: &errMsg}, err)
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
@@ -61,6 +61,10 @@ func handleExecute(w http.ResponseWriter, r *http.Request) {
 }
 
 func Execute(ctx context.Context, dsn string, request ducktape.ExecuteRequest) (sql.Result, error) {
+	if len(request.Statements) == 0 {
+		return nil, fmt.Errorf("at least one statement is required")
+	}
+
 	db, err := sql.Open("duckdb", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("failed to start a SQL client for execute(%q): %w", "duckdb", err)
@@ -71,17 +75,31 @@ func Execute(ctx context.Context, dsn string, request ducktape.ExecuteRequest) (
 		return nil, fmt.Errorf("failed to validate the DB connection for execute(%q): %w", "duckdb", err)
 	}
 
-	conn, err := db.Conn(ctx)
+	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get a connection for execute(%q): %w", "duckdb", err)
+		return nil, fmt.Errorf("failed to begin a transaction for execute(%q): %w", "duckdb", err)
 	}
-	defer conn.Close()
+	defer tx.Rollback()
 
-	slog.Debug("executing duckdb query", slog.String("query", request.Query), slog.Any("args", request.Args))
+	var totalRowsAffected int64
 
-	result, err := conn.ExecContext(ctx, request.Query, request.Args...)
-	if err != nil {
-		return nil, fmt.Errorf("failed to execute the query: %w", err)
+	for _, statement := range request.Statements {
+
+		slog.Debug("executing duckdb query", slog.String("query", statement.Query), slog.Any("args", statement.Args))
+
+		result, err := tx.ExecContext(ctx, statement.Query, statement.Args...)
+		if err != nil {
+			return nil, fmt.Errorf("failed to execute the query: %w", err)
+		}
+
+		rowsAffected, err := result.RowsAffected()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get the rows affected: %v", err)
+		}
+		totalRowsAffected += rowsAffected
 	}
-	return result, nil
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("failed to commit the transaction: %w", err)
+	}
+	return ducktape.ExecuteResponse{RowsAffectedCount: totalRowsAffected}, nil
 }

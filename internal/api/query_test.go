@@ -16,24 +16,27 @@ func TestQuery(t *testing.T) {
 
 	// Setup: Create a table with test data
 	_, err := Execute(ctx, dsn, ducktape.ExecuteRequest{
-		Query: `CREATE TABLE test_query (
+		Statements: []ducktape.ExecuteStatement{
+			{Query: `CREATE TABLE test_query (
 			id INTEGER,
 			name VARCHAR,
 			age INTEGER,
 			active BOOLEAN,
 			created_at TIMESTAMP
-		)`,
+		)`},
+		},
 	})
 	if err != nil {
 		t.Fatalf("failed to create test table: %v", err)
 	}
-	defer Execute(ctx, dsn, ducktape.ExecuteRequest{Query: "DROP TABLE test_query"})
 
 	_, err = Execute(ctx, dsn, ducktape.ExecuteRequest{
-		Query: `INSERT INTO test_query VALUES
+		Statements: []ducktape.ExecuteStatement{
+			{Query: `INSERT INTO test_query VALUES
 			(1, 'Alice', 30, true, '2024-01-15 10:00:00'),
 			(2, 'Bob', 25, false, '2024-02-20 14:30:00'),
-			(3, 'Charlie', 35, true, '2024-03-10 09:15:00')`,
+			(3, 'Charlie', 35, true, '2024-03-10 09:15:00')`},
+		},
 	})
 	if err != nil {
 		t.Fatalf("failed to insert test data: %v", err)
@@ -217,17 +220,20 @@ func TestQuery(t *testing.T) {
 		// Create temp table with NULL values
 		nullDsn := "test_query_nulls.db"
 		t.Cleanup(func() { os.Remove(nullDsn) })
-		defer Execute(ctx, nullDsn, ducktape.ExecuteRequest{Query: "DROP TABLE IF EXISTS test_query_nulls"})
 
 		_, err := Execute(ctx, nullDsn, ducktape.ExecuteRequest{
-			Query: `CREATE TABLE test_query_nulls (id INTEGER, value VARCHAR)`,
+			Statements: []ducktape.ExecuteStatement{
+				{Query: `CREATE TABLE test_query_nulls (id INTEGER, value VARCHAR)`},
+			},
 		})
 		if err != nil {
 			t.Fatalf("failed to create table: %v", err)
 		}
 
 		_, err = Execute(ctx, nullDsn, ducktape.ExecuteRequest{
-			Query: `INSERT INTO test_query_nulls VALUES (1, NULL), (2, 'test')`,
+			Statements: []ducktape.ExecuteStatement{
+				{Query: `INSERT INTO test_query_nulls VALUES (1, NULL), (2, 'test')`},
+			},
 		})
 		if err != nil {
 			t.Fatalf("failed to insert: %v", err)

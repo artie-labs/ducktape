@@ -18,11 +18,12 @@ func TestAppend(t *testing.T) {
 	t.Run("append basic data", func(t *testing.T) {
 		dsn := "test_append_basic.db"
 		t.Cleanup(func() { os.Remove(dsn) })
-		defer Execute(ctx, dsn, ducktape.ExecuteRequest{Query: "DROP TABLE IF EXISTS test_append_basic"})
 
 		// Create table
 		_, err := Execute(ctx, dsn, ducktape.ExecuteRequest{
-			Query: `CREATE TABLE test_append_basic (id INTEGER, name VARCHAR, age INTEGER)`,
+			Statements: []ducktape.ExecuteStatement{
+				{Query: `CREATE TABLE test_append_basic (id INTEGER, name VARCHAR, age INTEGER)`},
+			},
 		})
 		if err != nil {
 			t.Fatalf("failed to create table: %v", err)
@@ -67,10 +68,11 @@ func TestAppend(t *testing.T) {
 	t.Run("append with empty lines", func(t *testing.T) {
 		dsn := "test_append_empty_lines.db"
 		t.Cleanup(func() { os.Remove(dsn) })
-		defer Execute(ctx, dsn, ducktape.ExecuteRequest{Query: "DROP TABLE IF EXISTS test_append_empty_lines"})
 
 		_, err := Execute(ctx, dsn, ducktape.ExecuteRequest{
-			Query: `CREATE TABLE test_append_empty_lines (id INTEGER, value VARCHAR)`,
+			Statements: []ducktape.ExecuteStatement{
+				{Query: `CREATE TABLE test_append_empty_lines (id INTEGER, value VARCHAR)`},
+			},
 		})
 		if err != nil {
 			t.Fatalf("failed to create table: %v", err)
@@ -97,15 +99,16 @@ func TestAppend(t *testing.T) {
 	t.Run("append with temporal types", func(t *testing.T) {
 		dsn := "test_append_temporal.db"
 		t.Cleanup(func() { os.Remove(dsn) })
-		defer Execute(ctx, dsn, ducktape.ExecuteRequest{Query: "DROP TABLE IF EXISTS test_append_temporal"})
 
 		_, err := Execute(ctx, dsn, ducktape.ExecuteRequest{
-			Query: `CREATE TABLE test_append_temporal (
+			Statements: []ducktape.ExecuteStatement{
+				{Query: `CREATE TABLE test_append_temporal (
 				id INTEGER,
 				event_date DATE,
 				event_timestamp TIMESTAMP,
 				event_time TIME
-			)`,
+			)`},
+			},
 		})
 		if err != nil {
 			t.Fatalf("failed to create table: %v", err)
@@ -143,10 +146,11 @@ func TestAppend(t *testing.T) {
 	t.Run("append with NULL values", func(t *testing.T) {
 		dsn := "test_append_nulls.db"
 		t.Cleanup(func() { os.Remove(dsn) })
-		defer Execute(ctx, dsn, ducktape.ExecuteRequest{Query: "DROP TABLE IF EXISTS test_append_nulls"})
 
 		_, err := Execute(ctx, dsn, ducktape.ExecuteRequest{
-			Query: `CREATE TABLE test_append_nulls (id INTEGER, value VARCHAR, count INTEGER)`,
+			Statements: []ducktape.ExecuteStatement{
+				{Query: `CREATE TABLE test_append_nulls (id INTEGER, value VARCHAR, count INTEGER)`},
+			},
 		})
 		if err != nil {
 			t.Fatalf("failed to create table: %v", err)
@@ -184,10 +188,11 @@ func TestAppend(t *testing.T) {
 	t.Run("append with boolean values", func(t *testing.T) {
 		dsn := "test_append_boolean.db"
 		t.Cleanup(func() { os.Remove(dsn) })
-		defer Execute(ctx, dsn, ducktape.ExecuteRequest{Query: "DROP TABLE IF EXISTS test_append_boolean"})
 
 		_, err := Execute(ctx, dsn, ducktape.ExecuteRequest{
-			Query: `CREATE TABLE test_append_boolean (id INTEGER, active BOOLEAN, verified BOOLEAN)`,
+			Statements: []ducktape.ExecuteStatement{
+				{Query: `CREATE TABLE test_append_boolean (id INTEGER, active BOOLEAN, verified BOOLEAN)`},
+			},
 		})
 		if err != nil {
 			t.Fatalf("failed to create table: %v", err)
@@ -225,10 +230,11 @@ func TestAppend(t *testing.T) {
 	t.Run("invalid JSON", func(t *testing.T) {
 		dsn := "test_append_invalid.db"
 		t.Cleanup(func() { os.Remove(dsn) })
-		defer Execute(ctx, dsn, ducktape.ExecuteRequest{Query: "DROP TABLE IF EXISTS test_append_invalid"})
 
 		_, err := Execute(ctx, dsn, ducktape.ExecuteRequest{
-			Query: `CREATE TABLE test_append_invalid (id INTEGER, name VARCHAR)`,
+			Statements: []ducktape.ExecuteStatement{
+				{Query: `CREATE TABLE test_append_invalid (id INTEGER, name VARCHAR)`},
+			},
 		})
 		if err != nil {
 			t.Fatalf("failed to create table: %v", err)
@@ -259,10 +265,11 @@ func TestAppend(t *testing.T) {
 	t.Run("column count mismatch", func(t *testing.T) {
 		dsn := "test_append_mismatch.db"
 		t.Cleanup(func() { os.Remove(dsn) })
-		defer Execute(ctx, dsn, ducktape.ExecuteRequest{Query: "DROP TABLE IF EXISTS test_append_mismatch"})
 
 		_, err := Execute(ctx, dsn, ducktape.ExecuteRequest{
-			Query: `CREATE TABLE test_append_mismatch (id INTEGER, name VARCHAR)`,
+			Statements: []ducktape.ExecuteStatement{
+				{Query: `CREATE TABLE test_append_mismatch (id INTEGER, name VARCHAR)`},
+			},
 		})
 		if err != nil {
 			t.Fatalf("failed to create table: %v", err)
@@ -284,10 +291,11 @@ func TestAppend(t *testing.T) {
 	t.Run("empty input", func(t *testing.T) {
 		dsn := "test_append_empty.db"
 		t.Cleanup(func() { os.Remove(dsn) })
-		defer Execute(ctx, dsn, ducktape.ExecuteRequest{Query: "DROP TABLE IF EXISTS test_append_empty"})
 
 		_, err := Execute(ctx, dsn, ducktape.ExecuteRequest{
-			Query: `CREATE TABLE test_append_empty (id INTEGER, name VARCHAR)`,
+			Statements: []ducktape.ExecuteStatement{
+				{Query: `CREATE TABLE test_append_empty (id INTEGER, name VARCHAR)`},
+			},
 		})
 		if err != nil {
 			t.Fatalf("failed to create table: %v", err)
@@ -307,10 +315,11 @@ func TestAppend(t *testing.T) {
 	t.Run("large batch", func(t *testing.T) {
 		dsn := "test_append_large.db"
 		t.Cleanup(func() { os.Remove(dsn) })
-		defer Execute(ctx, dsn, ducktape.ExecuteRequest{Query: "DROP TABLE IF EXISTS test_append_large"})
 
 		_, err := Execute(ctx, dsn, ducktape.ExecuteRequest{
-			Query: `CREATE TABLE test_append_large (id INTEGER, value DOUBLE)`,
+			Statements: []ducktape.ExecuteStatement{
+				{Query: `CREATE TABLE test_append_large (id INTEGER, value DOUBLE)`},
+			},
 		})
 		if err != nil {
 			t.Fatalf("failed to create table: %v", err)

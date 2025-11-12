@@ -15,11 +15,12 @@ func TestQueryExecuteIntegration(t *testing.T) {
 	t.Run("create insert and query", func(t *testing.T) {
 		dsn := "test_integration.db"
 		t.Cleanup(func() { os.Remove(dsn) })
-		defer Execute(ctx, dsn, ducktape.ExecuteRequest{Query: "DROP TABLE IF EXISTS test_integration"})
 
 		// Create
 		_, err := Execute(ctx, dsn, ducktape.ExecuteRequest{
-			Query: `CREATE TABLE test_integration (id INTEGER, name VARCHAR, score DOUBLE)`,
+			Statements: []ducktape.ExecuteStatement{
+				{Query: `CREATE TABLE test_integration (id INTEGER, name VARCHAR, score DOUBLE)`},
+			},
 		})
 		if err != nil {
 			t.Fatalf("failed to create table: %v", err)
@@ -27,8 +28,9 @@ func TestQueryExecuteIntegration(t *testing.T) {
 
 		// Insert
 		_, err = Execute(ctx, dsn, ducktape.ExecuteRequest{
-			Query: "INSERT INTO test_integration VALUES (?, ?, ?)",
-			Args:  []any{1, "test", 95.5},
+			Statements: []ducktape.ExecuteStatement{
+				{Query: "INSERT INTO test_integration VALUES (?, ?, ?)", Args: []any{1, "test", 95.5}},
+			},
 		})
 		if err != nil {
 			t.Fatalf("failed to insert: %v", err)
@@ -63,16 +65,19 @@ func TestContextCancellation(t *testing.T) {
 
 		// Create a table first
 		_, err := Execute(context.Background(), dsn, ducktape.ExecuteRequest{
-			Query: "CREATE TABLE test_cancel (id INTEGER)",
+			Statements: []ducktape.ExecuteStatement{
+				{Query: "CREATE TABLE test_cancel (id INTEGER)"},
+			},
 		})
 		if err != nil {
 			t.Fatalf("failed to create table: %v", err)
 		}
-		defer Execute(context.Background(), dsn, ducktape.ExecuteRequest{Query: "DROP TABLE test_cancel"})
 
 		// This may or may not fail depending on timing, but should not panic
 		_, _ = Execute(ctx, dsn, ducktape.ExecuteRequest{
-			Query: "INSERT INTO test_cancel VALUES (1)",
+			Statements: []ducktape.ExecuteStatement{
+				{Query: "INSERT INTO test_cancel VALUES (1)"},
+			},
 		})
 	})
 

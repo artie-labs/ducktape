@@ -22,9 +22,13 @@ type QueryResponse struct {
 	Error *string          `json:"error"`
 }
 
-type ExecuteRequest struct {
+type ExecuteStatement struct {
 	Query string `json:"query"`
 	Args  []any  `json:"args"`
+}
+
+type ExecuteRequest struct {
+	Statements []ExecuteStatement `json:"statements"`
 }
 
 type ExecuteResponse struct {
