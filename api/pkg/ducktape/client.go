@@ -29,6 +29,31 @@ func NewClient(baseURL string) *Client {
 	return &Client{baseURL: baseURL, httpClient: &http.Client{Transport: tr}}
 }
 
+func (c *Client) Ping(
+	ctx context.Context,
+	connectionString string,
+) error {
+	url := fmt.Sprintf("%s%s", c.baseURL, PingRoute)
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set(DuckDBConnectionStringHeader, connectionString)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("failed to ping duckdb: %s", resp.Status)
+	}
+
+	return nil
+}
+
 func (c *Client) Execute(
 	ctx context.Context,
 	request ExecuteRequest,

@@ -4,6 +4,7 @@ const (
 	ExecuteRoute = "/api/execute"
 	QueryRoute   = "/api/query"
 	AppendRoute  = "/api/append"
+	PingRoute    = "/api/ping"
 
 	DuckDBConnectionStringHeader = "X-DuckDB-Connection-String"
 	DuckDBDatabaseHeader         = "X-DuckDB-Database"
