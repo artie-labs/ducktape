@@ -375,8 +375,7 @@ func BenchmarkAppend(b *testing.B) {
 	schemaName := "b"
 	tableName := "benchmark_append"
 	fullyQualifiedTableName := fmt.Sprintf("%s.%s.%s", databaseName, schemaName, tableName)
-	// b.Cleanup(func() { os.Remove(dsn) })
-	// defer Execute(ctx, dsn, ducktape.ExecuteRequest{Query: fmt.Sprintf("DROP TABLE IF EXISTS %s", fullyQualifiedTableName)})
+	b.Cleanup(func() { os.Remove(dsn) })
 
 	_, err := Execute(ctx, dsn, ducktape.ExecuteRequest{
 		Statements: []ducktape.ExecuteStatement{
@@ -432,7 +431,7 @@ func BenchmarkAppend(b *testing.B) {
 func BenchmarkAppend_1KB_Local(b *testing.B) {
 	ctx := b.Context()
 	dsn := "benchmark_1kb_local.db"
-	databaseName := "bench"
+	databaseName := "benchmark_1kb_local"
 	schemaName := "main"
 	tableName := "rows_1kb"
 	fullyQualifiedTableName := fmt.Sprintf("%s.%s.%s", databaseName, schemaName, tableName)
@@ -510,7 +509,7 @@ func BenchmarkAppend_1KB_Local(b *testing.B) {
 func BenchmarkAppend_64KB_Local(b *testing.B) {
 	ctx := b.Context()
 	dsn := "benchmark_64kb_local.db"
-	databaseName := "bench"
+	databaseName := "benchmark_64kb_local"
 	schemaName := "main"
 	tableName := "rows_64kb"
 	fullyQualifiedTableName := fmt.Sprintf("%s.%s.%s", databaseName, schemaName, tableName)
