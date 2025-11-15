@@ -4,12 +4,15 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"net/http"
 	"os"
 	"strings"
 	"testing"
 
 	"github.com/artie-labs/ducktape/api/pkg/ducktape"
 	_ "github.com/duckdb/duckdb-go/v2"
+	"golang.org/x/net/http2"
+	"golang.org/x/net/http2/h2c"
 )
 
 func TestAppend(t *testing.T) {
@@ -363,4 +366,63 @@ func TestAppend(t *testing.T) {
 			t.Errorf("expected 1000 rows in table, got %d", count)
 		}
 	})
+}
+
+func BenchmarkAppend(b *testing.B) {
+	ctx := b.Context()
+	dsn := "benchmark_append.db"
+	databaseName := "benchmark_append"
+	schemaName := "b"
+	tableName := "benchmark_append"
+	fullyQualifiedTableName := fmt.Sprintf("%s.%s.%s", databaseName, schemaName, tableName)
+	// b.Cleanup(func() { os.Remove(dsn) })
+	// defer Execute(ctx, dsn, ducktape.ExecuteRequest{Query: fmt.Sprintf("DROP TABLE IF EXISTS %s", fullyQualifiedTableName)})
+
+	_, err := Execute(ctx, dsn, ducktape.ExecuteRequest{
+		Statements: []ducktape.ExecuteStatement{
+			{Query: fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %s; CREATE TABLE %s (id BIGINT, name VARCHAR);", schemaName, fullyQualifiedTableName)},
+		},
+	})
+	if err != nil {
+		b.Fatalf("failed to create table: %v", err)
+	}
+
+	mux := http.NewServeMux()
+
+	RegisterApiRoutes(mux)
+	RegisterHealthCheckRoutes(mux)
+
+	h2cHandler := h2c.NewHandler(mux, &http2.Server{})
+
+	go func() {
+		http.ListenAndServe("0.0.0.0:58080", h2cHandler)
+	}()
+
+	client := ducktape.NewClient("http://localhost:58080")
+
+	var rowIndex uint64
+
+	streamIterator := func(yield func(ducktape.RowMessageResult) bool) {
+		for b.Loop() {
+			var rowValues []any
+			rowValues = append(rowValues, rowIndex)
+			rowValues = append(rowValues, "3457236795623875623478562348756234876587236587234")
+
+			if !yield(ducktape.RowMessageResult{Row: ducktape.RowMessage{Values: rowValues}}) {
+				return
+			}
+			rowIndex++
+		}
+	}
+
+	client.Append(ctx, dsn, databaseName, schemaName, tableName, streamIterator, func(r ducktape.RowMessage) ([]byte, error) {
+		return json.Marshal(r)
+	}, func(r []byte) (*ducktape.AppendResponse, error) {
+		var resp ducktape.AppendResponse
+		if err := json.Unmarshal(r, &resp); err != nil {
+			return nil, err
+		}
+		return &resp, nil
+	})
+
 }
