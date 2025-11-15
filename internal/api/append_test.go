@@ -4,12 +4,15 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"net/http"
 	"os"
 	"strings"
 	"testing"
 
 	"github.com/artie-labs/ducktape/api/pkg/ducktape"
 	_ "github.com/duckdb/duckdb-go/v2"
+	"golang.org/x/net/http2"
+	"golang.org/x/net/http2/h2c"
 )
 
 func TestAppend(t *testing.T) {
@@ -363,4 +366,215 @@ func TestAppend(t *testing.T) {
 			t.Errorf("expected 1000 rows in table, got %d", count)
 		}
 	})
+}
+
+func BenchmarkAppend(b *testing.B) {
+	ctx := b.Context()
+	dsn := "benchmark_append.db"
+	databaseName := "benchmark_append"
+	schemaName := "b"
+	tableName := "benchmark_append"
+	fullyQualifiedTableName := fmt.Sprintf("%s.%s.%s", databaseName, schemaName, tableName)
+	b.Cleanup(func() { os.Remove(dsn) })
+
+	_, err := Execute(ctx, dsn, ducktape.ExecuteRequest{
+		Statements: []ducktape.ExecuteStatement{
+			{Query: fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %s; CREATE TABLE %s (id BIGINT, name VARCHAR);", schemaName, fullyQualifiedTableName)},
+		},
+	})
+	if err != nil {
+		b.Fatalf("failed to create table: %v", err)
+	}
+
+	mux := http.NewServeMux()
+
+	RegisterApiRoutes(mux)
+	RegisterHealthCheckRoutes(mux)
+
+	h2cHandler := h2c.NewHandler(mux, &http2.Server{})
+
+	go func() {
+		http.ListenAndServe("0.0.0.0:58080", h2cHandler)
+	}()
+
+	client := ducktape.NewClient("http://localhost:58080")
+
+	var rowIndex uint64
+
+	streamIterator := func(yield func(ducktape.RowMessageResult) bool) {
+		for b.Loop() {
+			var rowValues []any
+			rowValues = append(rowValues, rowIndex)
+			rowValues = append(rowValues, "3457236795623875623478562348756234876587236587234")
+
+			if !yield(ducktape.RowMessageResult{Row: ducktape.RowMessage{Values: rowValues}}) {
+				return
+			}
+			rowIndex++
+		}
+	}
+
+	client.Append(ctx, dsn, databaseName, schemaName, tableName, streamIterator, func(r ducktape.RowMessage) ([]byte, error) {
+		return json.Marshal(r)
+	}, func(r []byte) (*ducktape.AppendResponse, error) {
+		var resp ducktape.AppendResponse
+		if err := json.Unmarshal(r, &resp); err != nil {
+			return nil, err
+		}
+		return &resp, nil
+	})
+
+}
+
+// BenchmarkAppend_1KB_Local tests small row throughput to local database
+// Simulates: transaction logs, event streams, small CDC records
+func BenchmarkAppend_1KB_Local(b *testing.B) {
+	ctx := b.Context()
+	dsn := "benchmark_1kb_local.db"
+	databaseName := "benchmark_1kb_local"
+	schemaName := "main"
+	tableName := "rows_1kb"
+	fullyQualifiedTableName := fmt.Sprintf("%s.%s.%s", databaseName, schemaName, tableName)
+
+	b.Cleanup(func() { os.Remove(dsn) })
+
+	// Schema mimics typical production: id, timestamps, metadata, small payload
+	_, err := Execute(ctx, dsn, ducktape.ExecuteRequest{
+		Statements: []ducktape.ExecuteStatement{
+			{Query: fmt.Sprintf(`CREATE SCHEMA IF NOT EXISTS %s;
+				CREATE TABLE %s (
+					id BIGINT,
+					created_at TIMESTAMP,
+					user_id BIGINT,
+					event_type VARCHAR,
+					metadata VARCHAR,
+					payload VARCHAR
+				);`, schemaName, fullyQualifiedTableName)},
+		},
+	})
+	if err != nil {
+		b.Fatalf("failed to create table: %v", err)
+	}
+
+	mux := http.NewServeMux()
+	RegisterApiRoutes(mux)
+	RegisterHealthCheckRoutes(mux)
+	h2cHandler := h2c.NewHandler(mux, &http2.Server{})
+
+	go func() {
+		http.ListenAndServe("0.0.0.0:58081", h2cHandler)
+	}()
+
+	client := ducktape.NewClient("http://localhost:58081")
+
+	// Generate ~1KB per row (adjust string lengths to hit target)
+	// 1KB = 1024 bytes, account for overhead, aim for ~900 bytes in payload
+	payload := strings.Repeat("x", 900)
+
+	var rowIndex uint64
+
+	streamIterator := func(yield func(ducktape.RowMessageResult) bool) {
+		for b.Loop() {
+			rowValues := []any{
+				rowIndex,
+				"2024-11-15T10:30:00Z",
+				rowIndex % 1000,
+				"user_action",
+				`{"source":"web","version":"1.0"}`,
+				payload,
+			}
+
+			if !yield(ducktape.RowMessageResult{Row: ducktape.RowMessage{Values: rowValues}}) {
+				return
+			}
+			rowIndex++
+		}
+	}
+
+	client.Append(ctx, dsn, databaseName, schemaName, tableName, streamIterator,
+		func(r ducktape.RowMessage) ([]byte, error) {
+			return json.Marshal(r)
+		},
+		func(r []byte) (*ducktape.AppendResponse, error) {
+			var resp ducktape.AppendResponse
+			if err := json.Unmarshal(r, &resp); err != nil {
+				return nil, err
+			}
+			return &resp, nil
+		})
+}
+
+// BenchmarkAppend_64KB_Local tests large row throughput to local database
+// Simulates: document storage, large JSON payloads, analytics data with wide schemas
+func BenchmarkAppend_64KB_Local(b *testing.B) {
+	ctx := b.Context()
+	dsn := "benchmark_64kb_local.db"
+	databaseName := "benchmark_64kb_local"
+	schemaName := "main"
+	tableName := "rows_64kb"
+	fullyQualifiedTableName := fmt.Sprintf("%s.%s.%s", databaseName, schemaName, tableName)
+
+	b.Cleanup(func() { os.Remove(dsn) })
+
+	_, err := Execute(ctx, dsn, ducktape.ExecuteRequest{
+		Statements: []ducktape.ExecuteStatement{
+			{Query: fmt.Sprintf(`CREATE SCHEMA IF NOT EXISTS %s;
+				CREATE TABLE %s (
+					id BIGINT,
+					created_at TIMESTAMP,
+					document_id VARCHAR,
+					content TEXT,
+					metadata JSON
+				);`, schemaName, fullyQualifiedTableName)},
+		},
+	})
+	if err != nil {
+		b.Fatalf("failed to create table: %v", err)
+	}
+
+	mux := http.NewServeMux()
+	RegisterApiRoutes(mux)
+	RegisterHealthCheckRoutes(mux)
+	h2cHandler := h2c.NewHandler(mux, &http2.Server{})
+
+	go func() {
+		http.ListenAndServe("0.0.0.0:58082", h2cHandler)
+	}()
+
+	client := ducktape.NewClient("http://localhost:58082")
+
+	// Generate ~64KB per row (65,536 bytes)
+	// Account for JSON overhead, aim for ~63KB in content
+	largePayload := strings.Repeat("Lorem ipsum dolor sit amet, consectetur adipiscing elit. ", 1100) // ~63KB
+
+	var rowIndex uint64
+
+	streamIterator := func(yield func(ducktape.RowMessageResult) bool) {
+		for b.Loop() {
+			rowValues := []any{
+				rowIndex,
+				"2024-11-15T10:30:00Z",
+				fmt.Sprintf("doc-%d", rowIndex),
+				largePayload,
+				`{"tags":["important","archived"],"version":2,"author":"system"}`,
+			}
+
+			if !yield(ducktape.RowMessageResult{Row: ducktape.RowMessage{Values: rowValues}}) {
+				return
+			}
+			rowIndex++
+		}
+	}
+
+	client.Append(ctx, dsn, databaseName, schemaName, tableName, streamIterator,
+		func(r ducktape.RowMessage) ([]byte, error) {
+			return json.Marshal(r)
+		},
+		func(r []byte) (*ducktape.AppendResponse, error) {
+			var resp ducktape.AppendResponse
+			if err := json.Unmarshal(r, &resp); err != nil {
+				return nil, err
+			}
+			return &resp, nil
+		})
 }
