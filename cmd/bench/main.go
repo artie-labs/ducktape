@@ -13,6 +13,12 @@ import (
 	"github.com/artie-labs/ducktape/api/pkg/ducktape"
 )
 
+type WorkerStatistics struct {
+	BytesWritten uint64
+	RowsAppended uint64
+	Elapsed      time.Duration
+}
+
 func main() {
 	dsn := flag.String("dsn", "", "DuckDB connection string")
 	database := flag.String("database", "benchmark", "Database name")
@@ -63,15 +69,18 @@ func main() {
 		log.Fatalf("failed to execute: %v", err)
 	}
 
-	startTime := time.Now()
 	rowsPerWorker := *numRows / *concurrency
 	extraRows := *numRows % *concurrency
 
 	var (
 		g                 errgroup.Group
 		totalBytesWritten uint64
+		totalRowsAppended uint64
 		bytesWrittenMu    = make(chan struct{}, 1) // Use channel as a mutex
+		workerStats       = make([]WorkerStatistics, *concurrency)
 	)
+
+	startTime := time.Now()
 
 	for i := 0; i < *concurrency; i++ {
 		workerID := i
@@ -81,6 +90,7 @@ func main() {
 		}
 		g.Go(func() error {
 			var rowIndex uint64 = uint64(workerID * rowsPerWorker)
+			var workerRowsAppended uint64
 			generatePayload := strings.Repeat("x", *rowSize)
 			var workerBytesWritten uint64
 
@@ -98,6 +108,7 @@ func main() {
 						return
 					}
 					rowIndex++
+					workerRowsAppended++
 				}
 			}
 
@@ -123,9 +134,16 @@ func main() {
 					return &resp, nil
 				},
 			)
-			// Atomically add to totalBytesWritten after append is done
+			workerElapsed := time.Since(startTime)
+			// Atomically update counters after append is done
 			bytesWrittenMu <- struct{}{}
 			totalBytesWritten += workerBytesWritten
+			totalRowsAppended += workerRowsAppended
+			workerStats[workerID] = WorkerStatistics{
+				BytesWritten: workerBytesWritten,
+				RowsAppended: workerRowsAppended,
+				Elapsed:      workerElapsed,
+			}
 			<-bytesWrittenMu
 
 			if err != nil {
@@ -141,8 +159,13 @@ func main() {
 
 	elapsed := time.Since(startTime)
 	bytesPerSecond := float64(totalBytesWritten) / elapsed.Seconds()
-	log.Printf("Appended %d rows (%d workers) in %v", *numRows, *concurrency, elapsed)
+	rowsPerSecond := float64(totalRowsAppended) / elapsed.Seconds()
+	log.Printf("Appended %d rows (%d workers) in %v", totalRowsAppended, *concurrency, elapsed)
 	log.Printf("Total bytes written: %d (%.2f MiB)", totalBytesWritten, float64(totalBytesWritten)/(1024*1024))
 	log.Printf("Throughput: %.2f bytes/sec (%.2f MiB/sec)", bytesPerSecond, bytesPerSecond/(1024*1024))
+	log.Printf("Throughput: %.2f rows/sec", rowsPerSecond)
+	for workerID, stat := range workerStats {
+		log.Printf("Worker %d: %.2f bytes/sec (%.2f MiB/sec), %.2f rows/sec, elapsed %v seconds", workerID, float64(stat.BytesWritten)/stat.Elapsed.Seconds(), float64(stat.BytesWritten)/(1024*1024*stat.Elapsed.Seconds()), float64(stat.RowsAppended)/stat.Elapsed.Seconds(), stat.Elapsed.Seconds())
+	}
 
 }
