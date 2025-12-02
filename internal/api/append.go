@@ -121,6 +121,11 @@ func Append(ctx context.Context, dsn string, database string, schema string, tab
 
 	// Stream NDJSON from request body
 	scanner := bufio.NewScanner(input)
+	// Increase buffer size to handle large rows (default is 64KB)
+	// Set to 4MB to accommodate very large JSON lines
+	maxBufferSize := 4 * 1024 * 1024 // 4MB
+	buf := make([]byte, 0, 64*1024)  // Initial buffer size
+	scanner.Buffer(buf, maxBufferSize)
 	var bytesSinceFlush uint64
 
 	for scanner.Scan() {
