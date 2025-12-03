@@ -5,10 +5,11 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"golang.org/x/sync/errgroup"
 	"log"
 	"strings"
 	"time"
+
+	"golang.org/x/sync/errgroup"
 
 	"github.com/artie-labs/ducktape/api/pkg/ducktape"
 )
@@ -40,16 +41,17 @@ func main() {
 
 	ctx := context.Background()
 
-	client := ducktape.NewClient(*ducktapeURL)
-	err := client.Ping(ctx, *dsn)
+	// Create a client just for setup (ping and create table)
+	setupClient := ducktape.NewClient(*ducktapeURL)
+	err := setupClient.Ping(ctx, *dsn)
 	if err != nil {
 		log.Fatalf("failed to ping DuckTape: %v", err)
 	}
 
-	_, err = client.Execute(ctx, ducktape.ExecuteRequest{
+	_, err = setupClient.Execute(ctx, ducktape.ExecuteRequest{
 		Statements: []ducktape.ExecuteStatement{
 			{Query: fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %s (
-					id BIGINT,
+					id BIGINT PRIMARY KEY,
 					created_at TIMESTAMP,
 					user_id BIGINT,
 					event_type VARCHAR,
@@ -89,6 +91,9 @@ func main() {
 			workerRows++
 		}
 		g.Go(func() error {
+			// Create a new client per worker to avoid HTTP/2 connection contention
+			workerClient := ducktape.NewClient(*ducktapeURL)
+
 			var rowIndex uint64 = uint64(workerID * rowsPerWorker)
 			var workerRowsAppended uint64
 			generatePayload := strings.Repeat("x", *rowSize)
@@ -112,7 +117,7 @@ func main() {
 				}
 			}
 
-			_, err := client.Append(
+			_, err := workerClient.Append(
 				ctx,
 				*dsn,
 				*database,
