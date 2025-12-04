@@ -119,8 +119,12 @@ func main() {
 				}
 			}()
 
-			// Call api.Append() directly - this will read from the pipe
-			rowsAppended, bytesRead, err := api.Append(ctx, *dsn, *database, *schema, *table, pr)
+			// Wrap pipe reader with a buffer to allow read-ahead, similar to how
+			// HTTP client buffers provide decoupling between writer and reader
+			bufferedReader := bufio.NewReaderSize(pr, ducktape.RecommendedBufferSize)
+
+			// Call api.Append() directly
+			rowsAppended, bytesRead, err := api.Append(ctx, *dsn, *database, *schema, *table, bufferedReader)
 			workerElapsed := time.Since(startTime)
 
 			// Atomically update counters after append is done
