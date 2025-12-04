@@ -1,6 +1,7 @@
 package ducktape
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"crypto/tls"
@@ -147,6 +148,7 @@ func (c *Client) Append(
 	pr, pw := io.Pipe()
 
 	go func() {
+		bw := bufio.NewWriterSize(pw, RecommendedBufferSize)
 		for rowMessageResult := range streamIterator {
 			if rowMessageResult.Error != nil {
 				pw.CloseWithError(fmt.Errorf("error in row message result: %s", *rowMessageResult.Error))
@@ -157,11 +159,18 @@ func (c *Client) Append(
 				pw.CloseWithError(err)
 				return
 			}
-			_, err = pw.Write(append(bytes, '\n'))
-			if err != nil {
+			if _, err = bw.Write(bytes); err != nil {
 				pw.CloseWithError(err)
 				return
 			}
+			if err = bw.WriteByte('\n'); err != nil {
+				pw.CloseWithError(err)
+				return
+			}
+		}
+		if err := bw.Flush(); err != nil {
+			pw.CloseWithError(err)
+			return
 		}
 		pw.Close()
 	}()

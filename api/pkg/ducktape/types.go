@@ -10,6 +10,9 @@ const (
 	DuckDBDatabaseHeader         = "X-DuckDB-Database"
 	DuckDBSchemaHeader           = "X-DuckDB-Schema"
 	DuckDBTableHeader            = "X-DuckDB-Table"
+
+	// RecommendedBufferSize is the recommended buffer size for streaming appends.
+	RecommendedBufferSize = 1 << 20 // 1 MB
 )
 
 type QueryRequest struct {

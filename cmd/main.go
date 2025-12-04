@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/artie-labs/ducktape/api/pkg/ducktape"
 	"github.com/artie-labs/ducktape/internal/api"
 	"github.com/artie-labs/ducktape/internal/logging"
 	"golang.org/x/net/http2"
@@ -56,7 +57,11 @@ func main() {
 	}
 
 	// Wrap the mux with h2c to support both HTTP/1.1 and HTTP/2
-	h2cHandler := h2c.NewHandler(mux, &http2.Server{})
+	h2cHandler := h2c.NewHandler(mux, &http2.Server{
+		MaxReadFrameSize:             ducktape.RecommendedBufferSize,
+		MaxUploadBufferPerConnection: ducktape.RecommendedBufferSize * 16, // 16 MB connection window
+		MaxUploadBufferPerStream:     ducktape.RecommendedBufferSize * 4,  // 4 MB per stream
+	})
 
 	log.Printf("Starting server on port %s\n", port)
 	log.Fatal(http.ListenAndServe("0.0.0.0:"+port, h2cHandler))
