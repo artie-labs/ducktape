@@ -20,6 +20,7 @@
 - **Execute**: Run DDL/DML queries that don't return results
 - **Query**: Fetch rows from DuckDB
 - **Append**: Stream data via HTTP/2 with NDJSON format
+  - [Benchmarks](BENCHMARKS.md)
 - **Go Client**: Native Go client library included
 
 ## Quick start
