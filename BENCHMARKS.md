@@ -180,13 +180,17 @@ Run with:
 | 64KB row size, 1M rows, 10 streams | `go run cmd/benchinprocess/main.go -dsn 'md:?motherduck_token=xxx' -concurrency 10 -row-size 65536` |
 
 Notes:
-- Truncate `benchmark.main.benchmark_append` after every run.
+- Truncate the `benchmark.main.benchmark_append` table before every run.
 
 <details>
 <summary><strong>1KB row size, 1M rows, 1 stream</strong> - Results</summary>
 
 ```
-(No results yet)
+2025/12/03 18:45:26 Appended 1000000 rows (1 workers) in 2m12.871971417s
+2025/12/03 18:45:26 Total bytes written: 1120667780 (1068.75 MiB)
+2025/12/03 18:45:26 Throughput: 8434192.46 bytes/sec (8.04 MiB/sec)
+2025/12/03 18:45:26 Throughput: 7526.04 rows/sec
+2025/12/03 18:45:26 Worker 0: 8434192.92 bytes/sec (8.04 MiB/sec), 7526.04 rows/sec, elapsed 132.871964208 seconds
 ```
 
 </details>
@@ -195,7 +199,20 @@ Notes:
 <summary><strong>1KB row size, 1M rows, 10 streams</strong> - Results</summary>
 
 ```
-(No results yet)
+2025/12/03 18:46:31 Appended 1000000 rows (10 workers) in 30.503455666s
+2025/12/03 18:46:31 Total bytes written: 1120667780 (1068.75 MiB)
+2025/12/03 18:46:31 Throughput: 36739043.35 bytes/sec (35.04 MiB/sec)
+2025/12/03 18:46:31 Throughput: 32783.17 rows/sec
+2025/12/03 18:46:31 Worker 0: 4117273.30 bytes/sec (3.93 MiB/sec), 3680.51 rows/sec, elapsed 27.170112833 seconds
+2025/12/03 18:46:31 Worker 1: 4183163.83 bytes/sec (3.99 MiB/sec), 3732.00 rows/sec, elapsed 26.795269 seconds
+2025/12/03 18:46:31 Worker 2: 3834181.23 bytes/sec (3.66 MiB/sec), 3420.66 rows/sec, elapsed 29.234142416 seconds
+2025/12/03 18:46:31 Worker 3: 4126318.12 bytes/sec (3.94 MiB/sec), 3681.29 rows/sec, elapsed 27.164410708 seconds
+2025/12/03 18:46:31 Worker 4: 4229301.11 bytes/sec (4.03 MiB/sec), 3773.16 rows/sec, elapsed 26.502960458 seconds
+2025/12/03 18:46:31 Worker 5: 3674633.60 bytes/sec (3.50 MiB/sec), 3278.32 rows/sec, elapsed 30.503449375 seconds
+2025/12/03 18:46:31 Worker 6: 4535932.49 bytes/sec (4.33 MiB/sec), 4046.72 rows/sec, elapsed 24.711346625 seconds
+2025/12/03 18:46:31 Worker 7: 3684132.58 bytes/sec (3.51 MiB/sec), 3286.79 rows/sec, elapsed 30.424800833 seconds
+2025/12/03 18:46:31 Worker 8: 4321585.14 bytes/sec (4.12 MiB/sec), 3855.49 rows/sec, elapsed 25.937010708 seconds
+2025/12/03 18:46:31 Worker 9: 4546666.20 bytes/sec (4.34 MiB/sec), 4056.30 rows/sec, elapsed 24.653008416 seconds
 ```
 
 </details>
@@ -233,7 +250,7 @@ Run with:
 | 64KB row size, 1M rows, 10 streams | `go run cmd/bench/main.go -dsn 'md:?motherduck_token=xxx' -concurrency 10 -row-size 65536` |
 
 Notes:
-- Truncate `benchmark.main.benchmark_append` after every run.
+- Truncate the `benchmark.main.benchmark_append` table before every run.
 - Run ducktape with `go run cmd/main.go`.
 - Kill ducktape and start it again for every run to discard any cached connections.
 
