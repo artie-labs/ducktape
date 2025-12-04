@@ -30,8 +30,9 @@
 docker pull artielabs/ducktape:latest
 docker run -e DUCKTAPE_LOG="debug" --rm --publish 8080:8080 --volume $PWD:/data artielabs/ducktape:latest
 
+# absolute path in DSN is required when ducktape runs in Docker and writing to local file
 curl -X POST 'http://localhost:8080/api/query' \
---header 'X-DuckDB-Connection-String: data/test.db' \
+--header 'X-DuckDB-Connection-String: /data/test.db' \
 --header 'Content-Type: application/json' \
 --data '{
     "Query": "CREATE TABLE test_file (id BIGINT);"
