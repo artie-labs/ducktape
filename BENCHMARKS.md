@@ -10,6 +10,9 @@ Run on M2 Max Macbook Pro with 32GB RAM and 1TB SSD.
 | 64KB row size, 1M rows, 1 stream   | `go run cmd/benchinprocess/main.go -dsn 'duckdb:benchmark.db' -concurrency 1 -row-size 65536`  |
 | 64KB row size, 1M rows, 10 streams | `go run cmd/benchinprocess/main.go -dsn 'duckdb:benchmark.db' -concurrency 10 -row-size 65536` |
 
+Notes:
+- Delete `benchmark.db` (and `benchmark.db.wal` if it exists) after every run.
+
 <details>
 <summary><strong>1KB row size, 1M rows, 1 stream</strong> - Results</summary>
 
@@ -90,6 +93,7 @@ Run on M2 Max Macbook Pro with 32GB RAM and 1TB SSD.
 Notes:
 - Run ducktape with `go run cmd/main.go`.
 - Kill ducktape and start it again for every run to discard any cached connections.
+- Delete `benchmark.db` (and `benchmark.db.wal` if it exists) after every run.
 
 <details>
 <summary><strong>1KB row size, 1M rows, 1 stream</strong> - Results</summary>
@@ -161,6 +165,59 @@ Notes:
 
 </details>
 
+# In-process Append to MotherDuck
+
+Run with:
+- Read/Write Duckling = `Standard`
+- Read Scaling Ducklings = `Standard`
+- Read Scaling Ducking Pool Size = `4 Ducklings`
+
+| Test                               | Command                                                                                    |
+| ---------------------------------- | ------------------------------------------------------------------------------------------ |
+| 1KB row size, 1M rows, 1 stream    | `go run cmd/benchinprocess/main.go -dsn 'md:?motherduck_token=xxx' -concurrency 1`                  |
+| 1KB row size, 1M rows, 10 streams  | `go run cmd/benchinprocess/main.go -dsn 'md:?motherduck_token=xxx' -concurrency 10`                 |
+| 64KB row size, 1M rows, 1 stream   | `go run cmd/benchinprocess/main.go -dsn 'md:?motherduck_token=xxx' -concurrency 1 -row-size 65536`  |
+| 64KB row size, 1M rows, 10 streams | `go run cmd/benchinprocess/main.go -dsn 'md:?motherduck_token=xxx' -concurrency 10 -row-size 65536` |
+
+Notes:
+- Truncate `benchmark.main.benchmark_append` after every run.
+
+<details>
+<summary><strong>1KB row size, 1M rows, 1 stream</strong> - Results</summary>
+
+```
+(No results yet)
+```
+
+</details>
+
+<details>
+<summary><strong>1KB row size, 1M rows, 10 streams</strong> - Results</summary>
+
+```
+(No results yet)
+```
+
+</details>
+
+<details>
+<summary><strong>64KB row size, 1M rows, 1 stream</strong> - Results</summary>
+
+```
+(No results yet)
+```
+
+</details>
+
+<details>
+<summary><strong>64KB row size, 1M rows, 10 streams</strong> - Results</summary>
+
+```
+(No results yet)
+```
+
+</details>
+
 # Append with HTTP/2 client and ducktape server to MotherDuck
 
 Run with:
@@ -176,6 +233,7 @@ Run with:
 | 64KB row size, 1M rows, 10 streams | `go run cmd/bench/main.go -dsn 'md:?motherduck_token=xxx' -concurrency 10 -row-size 65536` |
 
 Notes:
+- Truncate `benchmark.main.benchmark_append` after every run.
 - Run ducktape with `go run cmd/main.go`.
 - Kill ducktape and start it again for every run to discard any cached connections.
 
