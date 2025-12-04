@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -93,7 +94,8 @@ func main() {
 			// Write to pipe in a goroutine - errors will be propagated through the pipe
 			go func() {
 				defer pw.Close()
-				encoder := json.NewEncoder(pw)
+				bw := bufio.NewWriterSize(pw, ducktape.RecommendedBufferSize)
+				encoder := json.NewEncoder(bw)
 				for j := 0; j < workerRows; j++ {
 					rowIndex := startIndex + uint64(j)
 					rowMsg := ducktape.RowMessage{
@@ -110,6 +112,10 @@ func main() {
 						pw.CloseWithError(err)
 						return
 					}
+				}
+				if err := bw.Flush(); err != nil {
+					pw.CloseWithError(err)
+					return
 				}
 			}()
 
