@@ -1,6 +1,7 @@
 # In-process Append to local filesystem
 
 This is the baseline performance for the [DuckDB Appender API](https://duckdb.org/docs/stable/data/appender.html).
+Run on M2 Max Macbook Pro with 32GB RAM and 1TB SSD.
 
 | Test                               | Command                                                                                        |
 | ---------------------------------- | ---------------------------------------------------------------------------------------------- |
@@ -13,11 +14,11 @@ This is the baseline performance for the [DuckDB Appender API](https://duckdb.or
 <summary><strong>1KB row size, 1M rows, 1 stream</strong> - Results</summary>
 
 ```
-2025/12/03 11:33:58 Appended 1000000 rows (1 workers) in 12.173581083s
-2025/12/03 11:33:58 Total bytes written: 1120667780 (1068.75 MiB)
-2025/12/03 11:33:58 Throughput: 92057363.59 bytes/sec (87.79 MiB/sec)
-2025/12/03 11:33:58 Throughput: 82145.10 rows/sec
-2025/12/03 11:33:58 Worker 0: 92057383.75 bytes/sec (87.79 MiB/sec), 82145.12 rows/sec, elapsed 12.173578417 seconds
+2025/12/03 17:24:59 Appended 1000000 rows (1 workers) in 10.035456583s
+2025/12/03 17:24:59 Total bytes written: 1120667780 (1068.75 MiB)
+2025/12/03 17:24:59 Throughput: 111670831.39 bytes/sec (106.50 MiB/sec)
+2025/12/03 17:24:59 Throughput: 99646.69 rows/sec
+2025/12/03 17:24:59 Worker 0: 111670876.82 bytes/sec (106.50 MiB/sec), 99646.73 rows/sec, elapsed 10.0354525 seconds
 ```
 
 </details>
@@ -26,20 +27,20 @@ This is the baseline performance for the [DuckDB Appender API](https://duckdb.or
 <summary><strong>1KB row size, 1M rows, 10 streams</strong> - Results</summary>
 
 ```
-2025/12/03 11:34:46 Appended 1000000 rows (10 workers) in 4.0089535s
-2025/12/03 11:34:46 Total bytes written: 1120667780 (1068.75 MiB)
-2025/12/03 11:34:46 Throughput: 279541226.91 bytes/sec (266.59 MiB/sec)
-2025/12/03 11:34:46 Throughput: 249441.66 rows/sec
-2025/12/03 11:34:46 Worker 0: 27904271.40 bytes/sec (26.61 MiB/sec), 24944.20 rows/sec, elapsed 4.00894825 seconds
-2025/12/03 11:34:46 Worker 1: 29071072.84 bytes/sec (27.72 MiB/sec), 25935.71 rows/sec, elapsed 3.855688458 seconds
-2025/12/03 11:34:46 Worker 2: 28073931.48 bytes/sec (26.77 MiB/sec), 25046.11 rows/sec, elapsed 3.992636375 seconds
-2025/12/03 11:34:46 Worker 3: 29138861.18 bytes/sec (27.79 MiB/sec), 25996.18 rows/sec, elapsed 3.846718625 seconds
-2025/12/03 11:34:46 Worker 4: 30239101.53 bytes/sec (28.84 MiB/sec), 26977.76 rows/sec, elapsed 3.706756958 seconds
-2025/12/03 11:34:46 Worker 5: 28095312.15 bytes/sec (26.79 MiB/sec), 25065.18 rows/sec, elapsed 3.989597958 seconds
-2025/12/03 11:34:46 Worker 6: 29059936.75 bytes/sec (27.71 MiB/sec), 25925.77 rows/sec, elapsed 3.857166 seconds
-2025/12/03 11:34:46 Worker 7: 28050793.15 bytes/sec (26.75 MiB/sec), 25025.46 rows/sec, elapsed 3.995929791 seconds
-2025/12/03 11:34:46 Worker 8: 30161199.99 bytes/sec (28.76 MiB/sec), 26908.26 rows/sec, elapsed 3.716330916 seconds
-2025/12/03 11:34:46 Worker 9: 31088736.42 bytes/sec (29.65 MiB/sec), 27735.76 rows/sec, elapsed 3.6054537079999998 seconds
+2025/12/03 17:25:55 Appended 1000000 rows (10 workers) in 1.378996167s
+2025/12/03 17:25:55 Total bytes written: 1120667780 (1068.75 MiB)
+2025/12/03 17:25:55 Throughput: 812669249.43 bytes/sec (775.02 MiB/sec)
+2025/12/03 17:25:55 Throughput: 725165.18 rows/sec
+2025/12/03 17:25:55 Worker 0: 98700252.66 bytes/sec (94.13 MiB/sec), 88230.17 rows/sec, elapsed 1.133399125 seconds
+2025/12/03 17:25:55 Worker 1: 81283277.81 bytes/sec (77.52 MiB/sec), 72516.73 rows/sec, elapsed 1.378992125 seconds
+2025/12/03 17:25:55 Worker 2: 96802825.46 bytes/sec (92.32 MiB/sec), 86362.47 rows/sec, elapsed 1.157910417 seconds
+2025/12/03 17:25:55 Worker 3: 97086761.23 bytes/sec (92.59 MiB/sec), 86615.78 rows/sec, elapsed 1.154524042 seconds
+2025/12/03 17:25:55 Worker 4: 96497680.69 bytes/sec (92.03 MiB/sec), 86090.23 rows/sec, elapsed 1.161571959 seconds
+2025/12/03 17:25:55 Worker 5: 100773972.41 bytes/sec (96.11 MiB/sec), 89905.32 rows/sec, elapsed 1.11228125 seconds
+2025/12/03 17:25:55 Worker 6: 97410528.10 bytes/sec (92.90 MiB/sec), 86904.63 rows/sec, elapsed 1.150686709 seconds
+2025/12/03 17:25:55 Worker 7: 95848351.43 bytes/sec (91.41 MiB/sec), 85510.93 rows/sec, elapsed 1.169441084 seconds
+2025/12/03 17:25:55 Worker 8: 100897075.90 bytes/sec (96.22 MiB/sec), 90015.15 rows/sec, elapsed 1.110924167 seconds
+2025/12/03 17:25:55 Worker 9: 96988699.93 bytes/sec (92.50 MiB/sec), 86528.29 rows/sec, elapsed 1.155691334 seconds
 ```
 
 </details>
@@ -57,25 +58,27 @@ This is the baseline performance for the [DuckDB Appender API](https://duckdb.or
 <summary><strong>64KB row size, 1M rows, 10 streams</strong> - Results</summary>
 
 ```
-2025/12/03 14:06:50 Appended 1000000 rows (10 workers) in 3m26.142147791s
-2025/12/03 14:06:50 Total bytes written: 65632667780 (62592.19 MiB)
-2025/12/03 14:06:50 Throughput: 318385485.37 bytes/sec (303.64 MiB/sec)
-2025/12/03 14:06:50 Throughput: 4851.02 rows/sec
-2025/12/03 14:06:50 Worker 0: 60524496.07 bytes/sec (57.72 MiB/sec), 922.20 rows/sec, elapsed 108.436537375 seconds
-2025/12/03 14:06:50 Worker 1: 32489868.86 bytes/sec (30.98 MiB/sec), 495.02 rows/sec, elapsed 202.010326 seconds
-2025/12/03 14:06:50 Worker 2: 60252790.09 bytes/sec (57.46 MiB/sec), 918.03 rows/sec, elapsed 108.929212916 seconds
-2025/12/03 14:06:50 Worker 3: 60545021.09 bytes/sec (57.74 MiB/sec), 922.48 rows/sec, elapsed 108.40344725 seconds
-2025/12/03 14:06:50 Worker 4: 60213262.81 bytes/sec (57.42 MiB/sec), 917.43 rows/sec, elapsed 109.00072 seconds
-2025/12/03 14:06:50 Worker 5: 60213923.69 bytes/sec (57.42 MiB/sec), 917.44 rows/sec, elapsed 108.999523666 seconds
-2025/12/03 14:06:50 Worker 6: 60376899.86 bytes/sec (57.58 MiB/sec), 919.92 rows/sec, elapsed 108.705299791 seconds
-2025/12/03 14:06:50 Worker 7: 60495840.09 bytes/sec (57.69 MiB/sec), 921.73 rows/sec, elapsed 108.491575458 seconds
-2025/12/03 14:06:50 Worker 8: 60838087.80 bytes/sec (58.02 MiB/sec), 926.95 rows/sec, elapsed 107.881250666 seconds
-2025/12/03 14:06:50 Worker 9: 31838658.11 bytes/sec (30.36 MiB/sec), 485.10 rows/sec, elapsed 206.142136333 seconds
+2025/12/03 17:32:22 Appended 1000000 rows (10 workers) in 3m59.980814125s
+2025/12/03 17:32:22 Total bytes written: 65632667780 (62592.19 MiB)
+2025/12/03 17:32:22 Throughput: 273491312.29 bytes/sec (260.82 MiB/sec)
+2025/12/03 17:32:22 Throughput: 4167.00 rows/sec
+2025/12/03 17:32:22 Worker 0: 63156068.77 bytes/sec (60.23 MiB/sec), 962.30 rows/sec, elapsed 103.918228417 seconds
+2025/12/03 17:32:22 Worker 1: 27783629.84 bytes/sec (26.50 MiB/sec), 423.32 rows/sec, elapsed 236.22863675 seconds
+2025/12/03 17:32:22 Worker 2: 63031267.00 bytes/sec (60.11 MiB/sec), 960.36 rows/sec, elapsed 104.127511834 seconds
+2025/12/03 17:32:22 Worker 3: 27352867.24 bytes/sec (26.09 MiB/sec), 416.76 rows/sec, elapsed 239.948848584 seconds
+2025/12/03 17:32:22 Worker 4: 27776571.26 bytes/sec (26.49 MiB/sec), 423.21 rows/sec, elapsed 236.288667084 seconds
+2025/12/03 17:32:22 Worker 5: 63008215.37 bytes/sec (60.09 MiB/sec), 960.01 rows/sec, elapsed 104.165607 seconds
+2025/12/03 17:32:22 Worker 6: 63093893.89 bytes/sec (60.17 MiB/sec), 961.32 rows/sec, elapsed 104.024155042 seconds
+2025/12/03 17:32:22 Worker 7: 27349224.53 bytes/sec (26.08 MiB/sec), 416.70 rows/sec, elapsed 239.980807959 seconds
+2025/12/03 17:32:22 Worker 8: 63057055.40 bytes/sec (60.14 MiB/sec), 960.75 rows/sec, elapsed 104.084926875 seconds
+2025/12/03 17:32:22 Worker 9: 27780470.69 bytes/sec (26.49 MiB/sec), 423.27 rows/sec, elapsed 236.255500209 seconds
 ```
 
 </details>
 
 # Append with HTTP/2 client and ducktape server to local filesystem
+
+Run on M2 Max Macbook Pro with 32GB RAM and 1TB SSD.
 
 | Test                               | Command                                                                               |
 | ---------------------------------- | ------------------------------------------------------------------------------------- |
@@ -88,11 +91,11 @@ This is the baseline performance for the [DuckDB Appender API](https://duckdb.or
 <summary><strong>1KB row size, 1M rows, 1 stream</strong> - Results</summary>
 
 ```
-2025/12/03 13:52:50 Appended 1000000 rows (1 workers) in 13.9705635s
-2025/12/03 13:52:50 Total bytes written: 1120667780 (1068.75 MiB)
-2025/12/03 13:52:50 Throughput: 80216362.07 bytes/sec (76.50 MiB/sec)
-2025/12/03 13:52:50 Throughput: 71579.07 rows/sec
-2025/12/03 13:52:50 Worker 0: 80216648.68 bytes/sec (76.50 MiB/sec), 71579.33 rows/sec, elapsed 13.970513583 seconds
+2025/12/03 17:08:05 Appended 1000000 rows (1 workers) in 8.873319125s
+2025/12/03 17:08:06 Total bytes written: 1120667780 (1068.75 MiB)
+2025/12/03 17:08:06 Throughput: 126296345.73 bytes/sec (120.45 MiB/sec)
+2025/12/03 17:08:06 Throughput: 112697.40 rows/sec
+2025/12/03 17:08:06 Worker 0: 126296422.24 bytes/sec (120.45 MiB/sec), 112697.47 rows/sec, elapsed 8.87331375 seconds
 ```
 
 </details>
@@ -101,20 +104,20 @@ This is the baseline performance for the [DuckDB Appender API](https://duckdb.or
 <summary><strong>1KB row size, 1M rows, 10 streams</strong> - Results</summary>
 
 ```
-2025/12/03 13:54:06 Appended 1000000 rows (10 workers) in 5.386814291s
-2025/12/03 13:54:06 Total bytes written: 1120667780 (1068.75 MiB)
-2025/12/03 13:54:06 Throughput: 208039059.72 bytes/sec (198.40 MiB/sec)
-2025/12/03 13:54:06 Throughput: 185638.48 rows/sec
-2025/12/03 13:54:06 Worker 0: 21740104.44 bytes/sec (20.73 MiB/sec), 19433.92 rows/sec, elapsed 5.145641333 seconds
-2025/12/03 13:54:06 Worker 1: 21893903.52 bytes/sec (20.88 MiB/sec), 19532.61 rows/sec, elapsed 5.119644375 seconds
-2025/12/03 13:54:06 Worker 2: 21031627.68 bytes/sec (20.06 MiB/sec), 18763.33 rows/sec, elapsed 5.329544708 seconds
-2025/12/03 13:54:06 Worker 3: 21843721.34 bytes/sec (20.83 MiB/sec), 19487.84 rows/sec, elapsed 5.1314058750000004 seconds
-2025/12/03 13:54:06 Worker 4: 21874152.93 bytes/sec (20.86 MiB/sec), 19514.99 rows/sec, elapsed 5.124267 seconds
-2025/12/03 13:54:06 Worker 5: 21261537.02 bytes/sec (20.28 MiB/sec), 18968.44 rows/sec, elapsed 5.27191425 seconds
-2025/12/03 13:54:06 Worker 6: 22363081.45 bytes/sec (21.33 MiB/sec), 19951.18 rows/sec, elapsed 5.012234125 seconds
-2025/12/03 13:54:06 Worker 7: 21093358.56 bytes/sec (20.12 MiB/sec), 18818.40 rows/sec, elapsed 5.3139475 seconds
-2025/12/03 13:54:06 Worker 8: 23565516.66 bytes/sec (22.47 MiB/sec), 21023.93 rows/sec, elapsed 4.756483875 seconds
-2025/12/03 13:54:06 Worker 9: 20808048.29 bytes/sec (19.84 MiB/sec), 18563.86 rows/sec, elapsed 5.386809875 seconds
+2025/12/03 17:09:37 Appended 1000000 rows (10 workers) in 1.559228958s
+2025/12/03 17:09:37 Total bytes written: 1120667780 (1068.75 MiB)
+2025/12/03 17:09:37 Throughput: 718732020.88 bytes/sec (685.44 MiB/sec)
+2025/12/03 17:09:37 Throughput: 641342.63 rows/sec
+2025/12/03 17:09:37 Worker 0: 91152122.23 bytes/sec (86.93 MiB/sec), 81482.74 rows/sec, elapsed 1.227253708 seconds
+2025/12/03 17:09:37 Worker 1: 87338071.17 bytes/sec (83.29 MiB/sec), 77918.50 rows/sec, elapsed 1.283392208 seconds
+2025/12/03 17:09:37 Worker 2: 89799421.65 bytes/sec (85.64 MiB/sec), 80114.39 rows/sec, elapsed 1.248215166 seconds
+2025/12/03 17:09:37 Worker 3: 88451122.90 bytes/sec (84.35 MiB/sec), 78911.51 rows/sec, elapsed 1.26724225 seconds
+2025/12/03 17:09:37 Worker 4: 71887561.57 bytes/sec (68.56 MiB/sec), 64134.36 rows/sec, elapsed 1.559226625 seconds
+2025/12/03 17:09:37 Worker 5: 87831510.48 bytes/sec (83.76 MiB/sec), 78358.72 rows/sec, elapsed 1.2761820830000001 seconds
+2025/12/03 17:09:37 Worker 6: 87147216.18 bytes/sec (83.11 MiB/sec), 77748.23 rows/sec, elapsed 1.286202875 seconds
+2025/12/03 17:09:37 Worker 7: 87247304.12 bytes/sec (83.21 MiB/sec), 77837.53 rows/sec, elapsed 1.2847273750000001 seconds
+2025/12/03 17:09:37 Worker 8: 87639971.33 bytes/sec (83.58 MiB/sec), 78187.84 rows/sec, elapsed 1.278971208 seconds
+2025/12/03 17:09:37 Worker 9: 87066850.58 bytes/sec (83.03 MiB/sec), 77676.53 rows/sec, elapsed 1.287390083 seconds
 ```
 
 </details>
@@ -136,20 +139,20 @@ This is the baseline performance for the [DuckDB Appender API](https://duckdb.or
 <summary><strong>64KB row size, 1M rows, 10 streams</strong> - Results</summary>
 
 ```
-2025/12/03 14:02:03 Appended 1000000 rows (10 workers) in 4m17.302226042s
-2025/12/03 14:02:03 Total bytes written: 65632667780 (62592.19 MiB)
-2025/12/03 14:02:03 Throughput: 255080062.03 bytes/sec (243.26 MiB/sec)
-2025/12/03 14:02:03 Throughput: 3886.48 rows/sec
-2025/12/03 14:02:03 Worker 0: 57504113.85 bytes/sec (54.84 MiB/sec), 876.18 rows/sec, elapsed 114.132126209 seconds
-2025/12/03 14:02:03 Worker 1: 56098583.84 bytes/sec (53.50 MiB/sec), 854.73 rows/sec, elapsed 116.995627167 seconds
-2025/12/03 14:02:03 Worker 2: 56528380.47 bytes/sec (53.91 MiB/sec), 861.28 rows/sec, elapsed 116.106085917 seconds
-2025/12/03 14:02:03 Worker 3: 56144897.02 bytes/sec (53.54 MiB/sec), 855.44 rows/sec, elapsed 116.899119042 seconds
-2025/12/03 14:02:03 Worker 4: 56342696.11 bytes/sec (53.73 MiB/sec), 858.45 rows/sec, elapsed 116.488727959 seconds
-2025/12/03 14:02:03 Worker 5: 25615273.79 bytes/sec (24.43 MiB/sec), 390.28 rows/sec, elapsed 256.225604042 seconds
-2025/12/03 14:02:03 Worker 6: 56165176.99 bytes/sec (53.56 MiB/sec), 855.75 rows/sec, elapsed 116.856909417 seconds
-2025/12/03 14:02:03 Worker 7: 56361805.99 bytes/sec (53.75 MiB/sec), 858.74 rows/sec, elapsed 116.449231625 seconds
-2025/12/03 14:02:03 Worker 8: 56098130.17 bytes/sec (53.50 MiB/sec), 854.73 rows/sec, elapsed 116.996573334 seconds
-2025/12/03 14:02:03 Worker 9: 25508093.06 bytes/sec (24.33 MiB/sec), 388.65 rows/sec, elapsed 257.302221125 seconds
+2025/12/03 17:40:04 Appended 1000000 rows (10 workers) in 4m4.700770416s
+2025/12/03 17:40:04 Total bytes written: 65632667780 (62592.19 MiB)
+2025/12/03 17:40:04 Throughput: 268216024.28 bytes/sec (255.79 MiB/sec)
+2025/12/03 17:40:04 Throughput: 4086.62 rows/sec
+2025/12/03 17:40:04 Worker 0: 26820786.08 bytes/sec (25.58 MiB/sec), 408.66 rows/sec, elapsed 244.700761625 seconds
+2025/12/03 17:40:04 Worker 1: 27101093.17 bytes/sec (25.85 MiB/sec), 412.92 rows/sec, elapsed 242.178016916 seconds
+2025/12/03 17:40:04 Worker 2: 58941795.78 bytes/sec (56.21 MiB/sec), 898.05 rows/sec, elapsed 111.352036583 seconds
+2025/12/03 17:40:04 Worker 3: 58924506.90 bytes/sec (56.19 MiB/sec), 897.79 rows/sec, elapsed 111.384708083 seconds
+2025/12/03 17:40:04 Worker 4: 27106495.02 bytes/sec (25.85 MiB/sec), 413.00 rows/sec, elapsed 242.129755083 seconds
+2025/12/03 17:40:04 Worker 5: 59212763.13 bytes/sec (56.47 MiB/sec), 902.18 rows/sec, elapsed 110.842471333 seconds
+2025/12/03 17:40:04 Worker 6: 58930628.76 bytes/sec (56.20 MiB/sec), 897.88 rows/sec, elapsed 111.373137166 seconds
+2025/12/03 17:40:04 Worker 7: 58979748.63 bytes/sec (56.25 MiB/sec), 898.63 rows/sec, elapsed 111.280382708 seconds
+2025/12/03 17:40:04 Worker 8: 58892167.01 bytes/sec (56.16 MiB/sec), 897.30 rows/sec, elapsed 111.445873583 seconds
+2025/12/03 17:40:04 Worker 9: 59245932.95 bytes/sec (56.50 MiB/sec), 902.69 rows/sec, elapsed 110.780414333 seconds
 ```
 
 </details>
