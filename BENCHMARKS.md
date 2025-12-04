@@ -1,3 +1,8 @@
+# Scripts
+- [In-process Append](cmd/benchinprocess/main.go)
+- [Append with ducktape](cmd/bench/main.go)
+
+
 # In-process Append to local filesystem
 
 This is the baseline performance for the [DuckDB Appender API](https://duckdb.org/docs/stable/data/appender.html).
@@ -17,11 +22,11 @@ Notes:
 <summary><strong>1KB row size, 1M rows, 1 stream</strong> - Results</summary>
 
 ```
-2025/12/03 17:24:59 Appended 1000000 rows (1 workers) in 10.035456583s
-2025/12/03 17:24:59 Total bytes written: 1120667780 (1068.75 MiB)
-2025/12/03 17:24:59 Throughput: 111670831.39 bytes/sec (106.50 MiB/sec)
-2025/12/03 17:24:59 Throughput: 99646.69 rows/sec
-2025/12/03 17:24:59 Worker 0: 111670876.82 bytes/sec (106.50 MiB/sec), 99646.73 rows/sec, elapsed 10.0354525 seconds
+2025/12/04 10:10:41 Appended 1000000 rows (1 workers) in 8.725329917s
+2025/12/04 10:10:41 Total bytes written: 1120667780 (1068.75 MiB)
+2025/12/04 10:10:41 Throughput: 128438441.95 bytes/sec (122.49 MiB/sec)
+2025/12/04 10:10:41 Throughput: 114608.85 rows/sec
+2025/12/04 10:10:41 Worker 0: 128438495.31 bytes/sec (122.49 MiB/sec), 114608.89 rows/sec, elapsed 8.725326292 seconds
 ```
 
 </details>
@@ -30,20 +35,20 @@ Notes:
 <summary><strong>1KB row size, 1M rows, 10 streams</strong> - Results</summary>
 
 ```
-2025/12/03 17:25:55 Appended 1000000 rows (10 workers) in 1.378996167s
-2025/12/03 17:25:55 Total bytes written: 1120667780 (1068.75 MiB)
-2025/12/03 17:25:55 Throughput: 812669249.43 bytes/sec (775.02 MiB/sec)
-2025/12/03 17:25:55 Throughput: 725165.18 rows/sec
-2025/12/03 17:25:55 Worker 0: 98700252.66 bytes/sec (94.13 MiB/sec), 88230.17 rows/sec, elapsed 1.133399125 seconds
-2025/12/03 17:25:55 Worker 1: 81283277.81 bytes/sec (77.52 MiB/sec), 72516.73 rows/sec, elapsed 1.378992125 seconds
-2025/12/03 17:25:55 Worker 2: 96802825.46 bytes/sec (92.32 MiB/sec), 86362.47 rows/sec, elapsed 1.157910417 seconds
-2025/12/03 17:25:55 Worker 3: 97086761.23 bytes/sec (92.59 MiB/sec), 86615.78 rows/sec, elapsed 1.154524042 seconds
-2025/12/03 17:25:55 Worker 4: 96497680.69 bytes/sec (92.03 MiB/sec), 86090.23 rows/sec, elapsed 1.161571959 seconds
-2025/12/03 17:25:55 Worker 5: 100773972.41 bytes/sec (96.11 MiB/sec), 89905.32 rows/sec, elapsed 1.11228125 seconds
-2025/12/03 17:25:55 Worker 6: 97410528.10 bytes/sec (92.90 MiB/sec), 86904.63 rows/sec, elapsed 1.150686709 seconds
-2025/12/03 17:25:55 Worker 7: 95848351.43 bytes/sec (91.41 MiB/sec), 85510.93 rows/sec, elapsed 1.169441084 seconds
-2025/12/03 17:25:55 Worker 8: 100897075.90 bytes/sec (96.22 MiB/sec), 90015.15 rows/sec, elapsed 1.110924167 seconds
-2025/12/03 17:25:55 Worker 9: 96988699.93 bytes/sec (92.50 MiB/sec), 86528.29 rows/sec, elapsed 1.155691334 seconds
+2025/12/04 10:11:12 Appended 1000000 rows (10 workers) in 1.260621292s
+2025/12/04 10:11:12 Total bytes written: 1120667780 (1068.75 MiB)
+2025/12/04 10:11:12 Throughput: 888980526.60 bytes/sec (847.80 MiB/sec)
+2025/12/04 10:11:12 Throughput: 793259.65 rows/sec
+2025/12/04 10:11:12 Worker 0: 108961870.16 bytes/sec (103.91 MiB/sec), 97403.24 rows/sec, elapsed 1.026659875 seconds
+2025/12/04 10:11:12 Worker 1: 106577613.98 bytes/sec (101.64 MiB/sec), 95083.03 rows/sec, elapsed 1.051712417 seconds
+2025/12/04 10:11:12 Worker 2: 108604869.76 bytes/sec (103.57 MiB/sec), 96891.64 rows/sec, elapsed 1.032080792 seconds
+2025/12/04 10:11:12 Worker 3: 88915968.46 bytes/sec (84.80 MiB/sec), 79326.22 rows/sec, elapsed 1.260617209 seconds
+2025/12/04 10:11:12 Worker 4: 106331272.30 bytes/sec (101.41 MiB/sec), 94863.25 rows/sec, elapsed 1.054148959 seconds
+2025/12/04 10:11:12 Worker 5: 107520004.60 bytes/sec (102.54 MiB/sec), 95923.78 rows/sec, elapsed 1.042494375 seconds
+2025/12/04 10:11:12 Worker 6: 106954595.55 bytes/sec (102.00 MiB/sec), 95419.35 rows/sec, elapsed 1.048005459 seconds
+2025/12/04 10:11:12 Worker 7: 106451492.97 bytes/sec (101.52 MiB/sec), 94970.51 rows/sec, elapsed 1.052958459 seconds
+2025/12/04 10:11:12 Worker 8: 108468515.23 bytes/sec (103.44 MiB/sec), 96769.99 rows/sec, elapsed 1.033378209 seconds
+2025/12/04 10:11:12 Worker 9: 107875417.58 bytes/sec (102.88 MiB/sec), 96240.86 rows/sec, elapsed 1.039059709 seconds
 ```
 
 </details>
@@ -61,20 +66,20 @@ Notes:
 <summary><strong>64KB row size, 1M rows, 10 streams</strong> - Results</summary>
 
 ```
-2025/12/03 17:32:22 Appended 1000000 rows (10 workers) in 3m59.980814125s
-2025/12/03 17:32:22 Total bytes written: 65632667780 (62592.19 MiB)
-2025/12/03 17:32:22 Throughput: 273491312.29 bytes/sec (260.82 MiB/sec)
-2025/12/03 17:32:22 Throughput: 4167.00 rows/sec
-2025/12/03 17:32:22 Worker 0: 63156068.77 bytes/sec (60.23 MiB/sec), 962.30 rows/sec, elapsed 103.918228417 seconds
-2025/12/03 17:32:22 Worker 1: 27783629.84 bytes/sec (26.50 MiB/sec), 423.32 rows/sec, elapsed 236.22863675 seconds
-2025/12/03 17:32:22 Worker 2: 63031267.00 bytes/sec (60.11 MiB/sec), 960.36 rows/sec, elapsed 104.127511834 seconds
-2025/12/03 17:32:22 Worker 3: 27352867.24 bytes/sec (26.09 MiB/sec), 416.76 rows/sec, elapsed 239.948848584 seconds
-2025/12/03 17:32:22 Worker 4: 27776571.26 bytes/sec (26.49 MiB/sec), 423.21 rows/sec, elapsed 236.288667084 seconds
-2025/12/03 17:32:22 Worker 5: 63008215.37 bytes/sec (60.09 MiB/sec), 960.01 rows/sec, elapsed 104.165607 seconds
-2025/12/03 17:32:22 Worker 6: 63093893.89 bytes/sec (60.17 MiB/sec), 961.32 rows/sec, elapsed 104.024155042 seconds
-2025/12/03 17:32:22 Worker 7: 27349224.53 bytes/sec (26.08 MiB/sec), 416.70 rows/sec, elapsed 239.980807959 seconds
-2025/12/03 17:32:22 Worker 8: 63057055.40 bytes/sec (60.14 MiB/sec), 960.75 rows/sec, elapsed 104.084926875 seconds
-2025/12/03 17:32:22 Worker 9: 27780470.69 bytes/sec (26.49 MiB/sec), 423.27 rows/sec, elapsed 236.255500209 seconds
+2025/12/04 10:16:19 Appended 1000000 rows (10 workers) in 3m54.831375583s
+2025/12/04 10:16:19 Total bytes written: 65632667780 (62592.19 MiB)
+2025/12/04 10:16:19 Throughput: 279488495.17 bytes/sec (266.54 MiB/sec)
+2025/12/04 10:16:19 Throughput: 4258.37 rows/sec
+2025/12/04 10:16:19 Worker 0: 69264136.65 bytes/sec (66.06 MiB/sec), 1055.36 rows/sec, elapsed 94.754184458 seconds
+2025/12/04 10:16:19 Worker 1: 69389258.12 bytes/sec (66.17 MiB/sec), 1057.23 rows/sec, elapsed 94.586527917 seconds
+2025/12/04 10:16:19 Worker 2: 68315668.74 bytes/sec (65.15 MiB/sec), 1040.88 rows/sec, elapsed 96.072967167 seconds
+2025/12/04 10:16:19 Worker 3: 28046754.47 bytes/sec (26.75 MiB/sec), 427.33 rows/sec, elapsed 234.012424 seconds
+2025/12/04 10:16:19 Worker 4: 68650971.52 bytes/sec (65.47 MiB/sec), 1045.98 rows/sec, elapsed 95.603730792 seconds
+2025/12/04 10:16:19 Worker 5: 68537841.48 bytes/sec (65.36 MiB/sec), 1044.26 rows/sec, elapsed 95.761536375 seconds
+2025/12/04 10:16:19 Worker 6: 68494170.77 bytes/sec (65.32 MiB/sec), 1043.60 rows/sec, elapsed 95.822592292 seconds
+2025/12/04 10:16:19 Worker 7: 27948944.48 bytes/sec (26.65 MiB/sec), 425.84 rows/sec, elapsed 234.83137275 seconds
+2025/12/04 10:16:19 Worker 8: 28047087.21 bytes/sec (26.75 MiB/sec), 427.33 rows/sec, elapsed 234.009647833 seconds
+2025/12/04 10:16:19 Worker 9: 69550902.34 bytes/sec (66.33 MiB/sec), 1059.70 rows/sec, elapsed 94.366698042 seconds
 ```
 
 </details>
