@@ -9,19 +9,50 @@
 </h1>
 
 <div align="center">
-  <h3>Ducktape</h3>
+  <h3>Ducktape 🦆</h3>
   <p>Lightweight REST API for DuckDB with HTTP/2 streaming support.</p>
   <a href="https://artie.com/slack"><img src="https://img.shields.io/badge/slack-@artie-blue.svg?logo=slack"/></a>
-  <a href="https://github.com/artie-labs/duck/blob/master/LICENSE.txt"><img src="https://img.shields.io/badge/License-MIT-yellow.svg"/></a>
+  <a href="https://github.com/artie-labs/ducktape/blob/master/LICENSE.txt"><img src="https://img.shields.io/badge/License-MIT-yellow.svg"/></a>
 </div>
 
-## Features
+## What is ducktape?
 
-- **Execute**: Run DDL/DML queries that don't return results
-- **Query**: Fetch rows from DuckDB
-- **Append**: Stream data via HTTP/2 with NDJSON format
-  - [Benchmarks](BENCHMARKS.md)
-- **Go Client**: Native Go client library included
+Ducktape is a standalone microservice to:
+
+- **Append**: Append rows directly into DuckDB by streaming NDJSON over HTTP/2.
+- **Query**: Fetch rows from DuckDB.
+- **Execute**: Run statements within a transaction.
+
+**Why?** DuckDB's Go driver requires CGO, which breaks cross-compilation, complicates CI/CD, and bloats Docker images. Instead of rewriting the build pipelines for [Transfer](https://github.com/artie-labs/transfer), we isolated DuckDB behind a network boundary.
+
+The performance penalty is small—**~90% of native throughput** over the network. Pure Go apps stay portable; ducktape handles the CGO.
+
+A [native Go client](#go-client) library is included.
+
+## How it works
+
+```
+your service → stream NDJSON over HTTP/2 → ducktape → DuckDB (local file or MotherDuck)
+```
+
+Ducktape uses:
+
+- **HTTP/2 streaming** for high-throughput ingestion
+- **DuckDB's Appender API** for fast, type-aware row insertion
+- **NDJSON** as a simple, language-agnostic wire format
+
+If your app can produce NDJSON, it can talk to ducktape.
+
+## Performance
+
+| Benchmark                | Throughput   |
+| ------------------------ | ------------ |
+| In-process DuckDB append | ~848 MiB/sec |
+| Ducktape over HTTP/2     | ~757 MiB/sec |
+
+That's **~90% of native performance**, even across the network. For real-time ingestion workloads, this was fast enough that we didn't need to embed DuckDB at all.
+
+See [BENCHMARKS.md](BENCHMARKS.md) for detailed results.
 
 ## Quick start
 
@@ -86,22 +117,26 @@ curl -X POST http://localhost:8080/api/query \
 
 Streams NDJSON data over HTTP/2. Each line is a `RowMessage` with a `rv` (row values) array. Use the Go client for streaming large datasets.
 
-## Go client
-
-```bash
-go get github.com/artie-labs/ducktape/api
-```
-
-```go
-import "github.com/artie-labs/ducktape/api/pkg/ducktape"
-
-client := ducktape.NewClient("http://localhost:8080")
-```
-
 ## Configuration
 
 - `PORT`: Server port (default: `8080`)
 - `DUCKTAPE_LOG`: Log level (`debug`, `info`, `warn`, `error`)
+
+## Go client
+
+- Install Go module for client.
+  ```bash
+  go get github.com/artie-labs/ducktape/api
+  ```
+- Usage:
+
+  ```go
+  import "github.com/artie-labs/ducktape/api/pkg/ducktape"
+
+  client := ducktape.NewClient("http://localhost:8080")
+  ```
+
+- [Client source code](api/pkg/ducktape/client.go)
 
 ## License
 
