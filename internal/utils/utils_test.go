@@ -750,15 +750,43 @@ func TestConvertValue(t *testing.T) {
 			}
 		})
 
-		t.Run("fractional part longer than scale truncates", func(t *testing.T) {
+		t.Run("excess non-zero fractional digits returns error", func(t *testing.T) {
 			metadata := ColumnMetadata{Name: "val", Type: "DECIMAL(10,2)"}
-			result, err := ConvertValue("1.999", metadata)
+			_, err := ConvertValue("1.999", metadata)
+			if err == nil {
+				t.Error("expected error for fractional digits exceeding scale, but got none")
+			}
+		})
+
+		t.Run("excess trailing zeros are allowed", func(t *testing.T) {
+			metadata := ColumnMetadata{Name: "val", Type: "DECIMAL(10,2)"}
+			result, err := ConvertValue("1.990", metadata)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			d := result.(duckdb.Decimal)
 			if d.Value.Cmp(big.NewInt(199)) != 0 {
 				t.Errorf("expected unscaled value 199, got %s", d.Value.String())
+			}
+		})
+
+		t.Run("zero scale with non-zero fractional digits returns error", func(t *testing.T) {
+			metadata := ColumnMetadata{Name: "count", Type: "NUMERIC(10,0)"}
+			_, err := ConvertValue("12345.67", metadata)
+			if err == nil {
+				t.Error("expected error for fractional digits with scale 0, but got none")
+			}
+		})
+
+		t.Run("zero scale with only zero fractional digits is allowed", func(t *testing.T) {
+			metadata := ColumnMetadata{Name: "count", Type: "NUMERIC(10,0)"}
+			result, err := ConvertValue("12345.00", metadata)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			d := result.(duckdb.Decimal)
+			if d.Value.Cmp(big.NewInt(12345)) != 0 {
+				t.Errorf("expected unscaled value 12345, got %s", d.Value.String())
 			}
 		})
 

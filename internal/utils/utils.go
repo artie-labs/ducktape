@@ -203,6 +203,11 @@ func parseDecimalString(s string, scale uint8) (*big.Int, error) {
 	if len(fracPart) < int(scale) {
 		fracPart += strings.Repeat("0", int(scale)-len(fracPart))
 	} else if len(fracPart) > int(scale) {
+		for _, c := range fracPart[scale:] {
+			if c != '0' {
+				return nil, fmt.Errorf("value %q has %d fractional digits, exceeding scale %d", s, len(fracPart), scale)
+			}
+		}
 		fracPart = fracPart[:scale]
 	}
 
