@@ -6,6 +6,7 @@ import (
 	"database/sql/driver"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -83,6 +84,18 @@ func GetColumnMetadata(ctx context.Context, conn *sql.Conn, database, schema, ta
 func ConvertValue(value any, columnMetadata ColumnMetadata) (driver.Value, error) {
 	if value == nil {
 		return nil, nil
+	}
+
+	// Handle parameterized types like DECIMAL(15,2), NUMERIC(10,0)
+	if strings.HasPrefix(columnMetadata.Type, "DECIMAL") || strings.HasPrefix(columnMetadata.Type, "NUMERIC") {
+		if s, ok := value.(string); ok {
+			parsed, err := strconv.ParseFloat(s, 64)
+			if err != nil {
+				return 0, fmt.Errorf("failed to parse string to float64 for decimal column: %w", err)
+			}
+			return parsed, nil
+		}
+		return value, nil
 	}
 
 	switch columnMetadata.Type {
