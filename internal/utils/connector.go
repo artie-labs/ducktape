@@ -34,7 +34,7 @@ func NewConnector(dsn string) (*Connector, error) {
 		bootQueries := []string{
 			`INSTALL motherduck`,
 			`LOAD motherduck`,
-			fmt.Sprintf("SET motherduck_token='%s'", tokens[0]),
+			fmt.Sprintf("SET motherduck_token='%s'", escapeSQLString(tokens[0])),
 			`ATTACH 'md:'`,
 		}
 		for _, query := range bootQueries {
@@ -49,6 +49,10 @@ func NewConnector(dsn string) (*Connector, error) {
 		return nil, fmt.Errorf("failed to create connector: %w", err)
 	}
 	return &Connector{connector: c, db: sql.OpenDB(c)}, nil
+}
+
+func escapeSQLString(s string) string {
+	return strings.ReplaceAll(s, "'", "''")
 }
 
 func parseDSN(dsn string) url.Values {
