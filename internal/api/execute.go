@@ -21,7 +21,12 @@ func handleExecute(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := r.Context()
-	db := DBFromContext(ctx)
+	db, err := DBFromContext(ctx)
+	if err != nil {
+		errMsg := err.Error()
+		handleInternalServerErrorJSON(w, ducktape.ExecuteResponse{Error: &errMsg}, err)
+		return
+	}
 
 	result, err := Execute(ctx, db, request)
 	if err != nil {

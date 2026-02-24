@@ -50,7 +50,12 @@ func handleAppend(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := r.Context()
-	db := DBFromContext(ctx)
+	db, err := DBFromContext(ctx)
+	if err != nil {
+		errMsg := err.Error()
+		handleInternalServerErrorJSON(w, ducktape.AppendResponse{Error: &errMsg}, err)
+		return
+	}
 
 	rowsAppended, bytesRead, err := Append(ctx, db, database, schema, table, r.Body)
 	if err != nil {

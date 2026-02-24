@@ -12,7 +12,12 @@ import (
 func handlePing(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 	ctx := r.Context()
-	db := DBFromContext(ctx)
+	db, err := DBFromContext(ctx)
+	if err != nil {
+		errMsg := err.Error()
+		handleInternalServerErrorJSON(w, ducktape.QueryResponse{Error: &errMsg}, err)
+		return
+	}
 
 	if err := db.PingContext(ctx); err != nil {
 		err := fmt.Errorf("failed to validate the DB connection: %w", err)
