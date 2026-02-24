@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"database/sql"
 	"os"
 	"strings"
 	"testing"
@@ -17,8 +18,9 @@ func TestExecute(t *testing.T) {
 	t.Run("create table", func(t *testing.T) {
 		dsn := "test_execute_create.db"
 		t.Cleanup(func() { os.Remove(dsn) })
+		db := openTestDB(t, dsn)
 
-		result, err := Execute(ctx, dsn, ducktape.ExecuteRequest{
+		result, err := Execute(ctx, db, ducktape.ExecuteRequest{
 			Statements: []ducktape.ExecuteStatement{
 				{Query: `CREATE TABLE test_execute_create (id INTEGER, name VARCHAR)`},
 			},
@@ -40,9 +42,10 @@ func TestExecute(t *testing.T) {
 	t.Run("insert data", func(t *testing.T) {
 		dsn := "test_execute_insert.db"
 		t.Cleanup(func() { os.Remove(dsn) })
+		db := openTestDB(t, dsn)
 
 		// Create table
-		_, err := Execute(ctx, dsn, ducktape.ExecuteRequest{
+		_, err := Execute(ctx, db, ducktape.ExecuteRequest{
 			Statements: []ducktape.ExecuteStatement{
 				{Query: `CREATE TABLE test_execute_insert (id INTEGER, name VARCHAR, age INTEGER)`},
 			},
@@ -52,7 +55,7 @@ func TestExecute(t *testing.T) {
 		}
 
 		// Insert single row
-		result, err := Execute(ctx, dsn, ducktape.ExecuteRequest{
+		result, err := Execute(ctx, db, ducktape.ExecuteRequest{
 			Statements: []ducktape.ExecuteStatement{
 				{Query: "INSERT INTO test_execute_insert VALUES (?, ?, ?)", Args: []any{1, "Alice", 30}},
 			},
@@ -74,8 +77,9 @@ func TestExecute(t *testing.T) {
 	t.Run("insert multiple rows", func(t *testing.T) {
 		dsn := "test_execute_multi.db"
 		t.Cleanup(func() { os.Remove(dsn) })
+		db := openTestDB(t, dsn)
 
-		_, err := Execute(ctx, dsn, ducktape.ExecuteRequest{
+		_, err := Execute(ctx, db, ducktape.ExecuteRequest{
 			Statements: []ducktape.ExecuteStatement{
 				{Query: `CREATE TABLE test_execute_multi (id INTEGER, value VARCHAR)`},
 			},
@@ -84,7 +88,7 @@ func TestExecute(t *testing.T) {
 			t.Fatalf("failed to create table: %v", err)
 		}
 
-		result, err := Execute(ctx, dsn, ducktape.ExecuteRequest{
+		result, err := Execute(ctx, db, ducktape.ExecuteRequest{
 			Statements: []ducktape.ExecuteStatement{
 				{Query: `INSERT INTO test_execute_multi VALUES (1, 'a'), (2, 'b'), (3, 'c')`},
 			},
@@ -106,8 +110,9 @@ func TestExecute(t *testing.T) {
 	t.Run("update data", func(t *testing.T) {
 		dsn := "test_execute_update.db"
 		t.Cleanup(func() { os.Remove(dsn) })
+		db := openTestDB(t, dsn)
 
-		_, err := Execute(ctx, dsn, ducktape.ExecuteRequest{
+		_, err := Execute(ctx, db, ducktape.ExecuteRequest{
 			Statements: []ducktape.ExecuteStatement{
 				{Query: `CREATE TABLE test_execute_update (id INTEGER, status VARCHAR)`},
 			},
@@ -117,7 +122,7 @@ func TestExecute(t *testing.T) {
 		}
 
 		// Insert data
-		_, err = Execute(ctx, dsn, ducktape.ExecuteRequest{
+		_, err = Execute(ctx, db, ducktape.ExecuteRequest{
 			Statements: []ducktape.ExecuteStatement{
 				{Query: `INSERT INTO test_execute_update VALUES (1, 'pending'), (2, 'pending'), (3, 'done')`},
 			},
@@ -127,7 +132,7 @@ func TestExecute(t *testing.T) {
 		}
 
 		// Update rows
-		result, err := Execute(ctx, dsn, ducktape.ExecuteRequest{
+		result, err := Execute(ctx, db, ducktape.ExecuteRequest{
 			Statements: []ducktape.ExecuteStatement{
 				{Query: "UPDATE test_execute_update SET status = ? WHERE status = ?", Args: []any{"completed", "pending"}},
 			},
@@ -149,8 +154,9 @@ func TestExecute(t *testing.T) {
 	t.Run("delete data", func(t *testing.T) {
 		dsn := "test_execute_delete.db"
 		t.Cleanup(func() { os.Remove(dsn) })
+		db := openTestDB(t, dsn)
 
-		_, err := Execute(ctx, dsn, ducktape.ExecuteRequest{
+		_, err := Execute(ctx, db, ducktape.ExecuteRequest{
 			Statements: []ducktape.ExecuteStatement{
 				{Query: `CREATE TABLE test_execute_delete (id INTEGER, active BOOLEAN)`},
 			},
@@ -160,7 +166,7 @@ func TestExecute(t *testing.T) {
 		}
 
 		// Insert data
-		_, err = Execute(ctx, dsn, ducktape.ExecuteRequest{
+		_, err = Execute(ctx, db, ducktape.ExecuteRequest{
 			Statements: []ducktape.ExecuteStatement{
 				{Query: `INSERT INTO test_execute_delete VALUES (1, true), (2, false), (3, false)`},
 			},
@@ -170,7 +176,7 @@ func TestExecute(t *testing.T) {
 		}
 
 		// Delete rows
-		result, err := Execute(ctx, dsn, ducktape.ExecuteRequest{
+		result, err := Execute(ctx, db, ducktape.ExecuteRequest{
 			Statements: []ducktape.ExecuteStatement{
 				{Query: "DELETE FROM test_execute_delete WHERE active = ?", Args: []any{false}},
 			},
@@ -190,7 +196,8 @@ func TestExecute(t *testing.T) {
 	})
 
 	t.Run("invalid SQL", func(t *testing.T) {
-		_, err := Execute(ctx, "", ducktape.ExecuteRequest{
+		db := openTestDB(t, "")
+		_, err := Execute(ctx, db, ducktape.ExecuteRequest{
 			Statements: []ducktape.ExecuteStatement{
 				{Query: "INVALID SQL STATEMENT"},
 			},
@@ -206,8 +213,9 @@ func TestExecute(t *testing.T) {
 	t.Run("parameterized query with args", func(t *testing.T) {
 		dsn := "test_execute_params.db"
 		t.Cleanup(func() { os.Remove(dsn) })
+		db := openTestDB(t, dsn)
 
-		_, err := Execute(ctx, dsn, ducktape.ExecuteRequest{
+		_, err := Execute(ctx, db, ducktape.ExecuteRequest{
 			Statements: []ducktape.ExecuteStatement{
 				{Query: `CREATE TABLE test_execute_params (id INTEGER, name VARCHAR, created_at TIMESTAMP)`},
 			},
@@ -217,7 +225,7 @@ func TestExecute(t *testing.T) {
 		}
 
 		now := time.Now()
-		result, err := Execute(ctx, dsn, ducktape.ExecuteRequest{
+		result, err := Execute(ctx, db, ducktape.ExecuteRequest{
 			Statements: []ducktape.ExecuteStatement{
 				{Query: "INSERT INTO test_execute_params VALUES (?, ?, ?)", Args: []any{1, "test", now}},
 			},
@@ -237,7 +245,13 @@ func TestExecute(t *testing.T) {
 	})
 
 	t.Run("invalid DSN", func(t *testing.T) {
-		_, err := Execute(ctx, "invalid://dsn", ducktape.ExecuteRequest{
+		db, err := sql.Open("duckdb", "invalid://dsn")
+		if err != nil {
+			return // error at open time is acceptable
+		}
+		defer db.Close()
+
+		_, err = Execute(ctx, db, ducktape.ExecuteRequest{
 			Statements: []ducktape.ExecuteStatement{
 				{Query: "SELECT 1"},
 			},
@@ -250,9 +264,10 @@ func TestExecute(t *testing.T) {
 	t.Run("multiple statements in single transaction", func(t *testing.T) {
 		dsn := "test_execute_multi_statements.db"
 		t.Cleanup(func() { os.Remove(dsn) })
+		db := openTestDB(t, dsn)
 
 		// Execute multiple statements in a single transaction
-		result, err := Execute(ctx, dsn, ducktape.ExecuteRequest{
+		result, err := Execute(ctx, db, ducktape.ExecuteRequest{
 			Statements: []ducktape.ExecuteStatement{
 				{Query: `CREATE TABLE test_multi_stmt (id INTEGER, status VARCHAR, count INTEGER)`},
 				{Query: `INSERT INTO test_multi_stmt VALUES (1, 'pending', 10), (2, 'pending', 20), (3, 'done', 30)`},
@@ -276,7 +291,7 @@ func TestExecute(t *testing.T) {
 		}
 
 		// Verify the final state of the table
-		rows, err := Query(ctx, dsn, ducktape.QueryRequest{
+		rows, err := Query(ctx, db, ducktape.QueryRequest{
 			Query: "SELECT * FROM test_multi_stmt ORDER BY id",
 		})
 		if err != nil {
@@ -300,9 +315,10 @@ func TestExecute(t *testing.T) {
 	t.Run("multiple statements rollback on error", func(t *testing.T) {
 		dsn := "test_execute_rollback.db"
 		t.Cleanup(func() { os.Remove(dsn) })
+		db := openTestDB(t, dsn)
 
 		// First, create a table successfully
-		_, err := Execute(ctx, dsn, ducktape.ExecuteRequest{
+		_, err := Execute(ctx, db, ducktape.ExecuteRequest{
 			Statements: []ducktape.ExecuteStatement{
 				{Query: `CREATE TABLE test_rollback (id INTEGER, value VARCHAR)`},
 			},
@@ -313,7 +329,7 @@ func TestExecute(t *testing.T) {
 
 		// Try to execute multiple statements where the last one fails
 		// This should rollback the entire transaction
-		_, err = Execute(ctx, dsn, ducktape.ExecuteRequest{
+		_, err = Execute(ctx, db, ducktape.ExecuteRequest{
 			Statements: []ducktape.ExecuteStatement{
 				{Query: `INSERT INTO test_rollback VALUES (1, 'first')`},
 				{Query: `INSERT INTO test_rollback VALUES (2, 'second')`},
@@ -325,7 +341,7 @@ func TestExecute(t *testing.T) {
 		}
 
 		// Verify the table is empty (transaction was rolled back)
-		rows, err := Query(ctx, dsn, ducktape.QueryRequest{
+		rows, err := Query(ctx, db, ducktape.QueryRequest{
 			Query: "SELECT * FROM test_rollback",
 		})
 		if err != nil {

@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"database/sql"
 	"os"
 	"testing"
 
@@ -13,9 +14,10 @@ func TestQuery(t *testing.T) {
 	ctx := context.Background()
 	dsn := "test_query.db"
 	t.Cleanup(func() { os.Remove(dsn) })
+	db := openTestDB(t, dsn)
 
 	// Setup: Create a table with test data
-	_, err := Execute(ctx, dsn, ducktape.ExecuteRequest{
+	_, err := Execute(ctx, db, ducktape.ExecuteRequest{
 		Statements: []ducktape.ExecuteStatement{
 			{Query: `CREATE TABLE test_query (
 			id INTEGER,
@@ -30,7 +32,7 @@ func TestQuery(t *testing.T) {
 		t.Fatalf("failed to create test table: %v", err)
 	}
 
-	_, err = Execute(ctx, dsn, ducktape.ExecuteRequest{
+	_, err = Execute(ctx, db, ducktape.ExecuteRequest{
 		Statements: []ducktape.ExecuteStatement{
 			{Query: `INSERT INTO test_query VALUES
 			(1, 'Alice', 30, true, '2024-01-15 10:00:00'),
@@ -43,7 +45,7 @@ func TestQuery(t *testing.T) {
 	}
 
 	t.Run("select all rows", func(t *testing.T) {
-		result, err := Query(ctx, dsn, ducktape.QueryRequest{
+		result, err := Query(ctx, db, ducktape.QueryRequest{
 			Query: "SELECT * FROM test_query ORDER BY id",
 		})
 		if err != nil {
@@ -64,7 +66,7 @@ func TestQuery(t *testing.T) {
 	})
 
 	t.Run("select with WHERE clause", func(t *testing.T) {
-		result, err := Query(ctx, dsn, ducktape.QueryRequest{
+		result, err := Query(ctx, db, ducktape.QueryRequest{
 			Query: "SELECT * FROM test_query WHERE active = true",
 		})
 		if err != nil {
@@ -83,7 +85,7 @@ func TestQuery(t *testing.T) {
 	})
 
 	t.Run("select with parameterized query", func(t *testing.T) {
-		result, err := Query(ctx, dsn, ducktape.QueryRequest{
+		result, err := Query(ctx, db, ducktape.QueryRequest{
 			Query: "SELECT * FROM test_query WHERE id = ?",
 			Args:  []any{2},
 		})
@@ -101,7 +103,7 @@ func TestQuery(t *testing.T) {
 	})
 
 	t.Run("select specific columns", func(t *testing.T) {
-		result, err := Query(ctx, dsn, ducktape.QueryRequest{
+		result, err := Query(ctx, db, ducktape.QueryRequest{
 			Query: "SELECT id, name FROM test_query ORDER BY id",
 		})
 		if err != nil {
@@ -130,7 +132,7 @@ func TestQuery(t *testing.T) {
 	})
 
 	t.Run("aggregate query", func(t *testing.T) {
-		result, err := Query(ctx, dsn, ducktape.QueryRequest{
+		result, err := Query(ctx, db, ducktape.QueryRequest{
 			Query: "SELECT COUNT(*) as count, AVG(age) as avg_age FROM test_query",
 		})
 		if err != nil {
@@ -152,7 +154,7 @@ func TestQuery(t *testing.T) {
 	})
 
 	t.Run("empty result set", func(t *testing.T) {
-		result, err := Query(ctx, dsn, ducktape.QueryRequest{
+		result, err := Query(ctx, db, ducktape.QueryRequest{
 			Query: "SELECT * FROM test_query WHERE id = 999",
 		})
 		if err != nil {
@@ -165,7 +167,7 @@ func TestQuery(t *testing.T) {
 	})
 
 	t.Run("query with ORDER BY", func(t *testing.T) {
-		result, err := Query(ctx, dsn, ducktape.QueryRequest{
+		result, err := Query(ctx, db, ducktape.QueryRequest{
 			Query: "SELECT name FROM test_query ORDER BY age DESC",
 		})
 		if err != nil {
@@ -186,7 +188,7 @@ func TestQuery(t *testing.T) {
 	})
 
 	t.Run("query with LIMIT", func(t *testing.T) {
-		result, err := Query(ctx, dsn, ducktape.QueryRequest{
+		result, err := Query(ctx, db, ducktape.QueryRequest{
 			Query: "SELECT * FROM test_query LIMIT 2",
 		})
 		if err != nil {
@@ -199,7 +201,8 @@ func TestQuery(t *testing.T) {
 	})
 
 	t.Run("invalid SQL", func(t *testing.T) {
-		_, err := Query(ctx, "", ducktape.QueryRequest{
+		inMemDB := openTestDB(t, "")
+		_, err := Query(ctx, inMemDB, ducktape.QueryRequest{
 			Query: "INVALID SQL QUERY",
 		})
 		if err == nil {
@@ -208,7 +211,8 @@ func TestQuery(t *testing.T) {
 	})
 
 	t.Run("query non-existent table", func(t *testing.T) {
-		_, err := Query(ctx, "", ducktape.QueryRequest{
+		inMemDB := openTestDB(t, "")
+		_, err := Query(ctx, inMemDB, ducktape.QueryRequest{
 			Query: "SELECT * FROM non_existent_table",
 		})
 		if err == nil {
@@ -220,8 +224,9 @@ func TestQuery(t *testing.T) {
 		// Create temp table with NULL values
 		nullDsn := "test_query_nulls.db"
 		t.Cleanup(func() { os.Remove(nullDsn) })
+		nullDB := openTestDB(t, nullDsn)
 
-		_, err := Execute(ctx, nullDsn, ducktape.ExecuteRequest{
+		_, err := Execute(ctx, nullDB, ducktape.ExecuteRequest{
 			Statements: []ducktape.ExecuteStatement{
 				{Query: `CREATE TABLE test_query_nulls (id INTEGER, value VARCHAR)`},
 			},
@@ -230,7 +235,7 @@ func TestQuery(t *testing.T) {
 			t.Fatalf("failed to create table: %v", err)
 		}
 
-		_, err = Execute(ctx, nullDsn, ducktape.ExecuteRequest{
+		_, err = Execute(ctx, nullDB, ducktape.ExecuteRequest{
 			Statements: []ducktape.ExecuteStatement{
 				{Query: `INSERT INTO test_query_nulls VALUES (1, NULL), (2, 'test')`},
 			},
@@ -239,7 +244,7 @@ func TestQuery(t *testing.T) {
 			t.Fatalf("failed to insert: %v", err)
 		}
 
-		result, err := Query(ctx, nullDsn, ducktape.QueryRequest{
+		result, err := Query(ctx, nullDB, ducktape.QueryRequest{
 			Query: "SELECT * FROM test_query_nulls ORDER BY id",
 		})
 		if err != nil {
@@ -256,7 +261,13 @@ func TestQuery(t *testing.T) {
 	})
 
 	t.Run("invalid DSN", func(t *testing.T) {
-		_, err := Query(ctx, "invalid://dsn", ducktape.QueryRequest{
+		invalidDB, err := sql.Open("duckdb", "invalid://dsn")
+		if err != nil {
+			return // error at open time is acceptable
+		}
+		defer invalidDB.Close()
+
+		_, err = Query(ctx, invalidDB, ducktape.QueryRequest{
 			Query: "SELECT 1",
 		})
 		if err == nil {

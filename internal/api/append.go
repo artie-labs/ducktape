@@ -31,14 +31,6 @@ func handleAppend(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	dsn := r.Header.Get(ducktape.DuckDBConnectionStringHeader)
-	if dsn == "" {
-		err := fmt.Errorf("%q header is required", ducktape.DuckDBConnectionStringHeader)
-		errMsg := err.Error()
-		handleBadRequestJSON(w, ducktape.AppendResponse{Error: &errMsg}, err)
-		return
-	}
-
 	database := r.Header.Get(ducktape.DuckDBDatabaseHeader)
 	if database == "" {
 		err := fmt.Errorf("%q header is required", ducktape.DuckDBDatabaseHeader)
@@ -58,15 +50,15 @@ func handleAppend(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := r.Context()
+	db := DBFromContext(ctx)
 
-	rowsAppended, bytesRead, err := Append(ctx, dsn, database, schema, table, r.Body)
+	rowsAppended, bytesRead, err := Append(ctx, db, database, schema, table, r.Body)
 	if err != nil {
 		errMsg := err.Error()
 		handleInternalServerErrorJSON(w, ducktape.AppendResponse{Error: &errMsg}, err)
 		return
 	}
 
-	// Return success response
 	response := ducktape.AppendResponse{
 		RowsAppended: rowsAppended,
 	}
@@ -83,26 +75,16 @@ func handleAppend(w http.ResponseWriter, r *http.Request) {
 	slog.Info(fmt.Sprintf("append complete for table %s.%s.%s", database, schema, table), slog.Int64("totalRowsAppended", rowsAppended), slog.Uint64("totalBytesRead", bytesRead), slog.Duration("elapsed", time.Since(start)))
 }
 
-func Append(ctx context.Context, dsn string, database string, schema string, table string, input io.Reader) (rowsAppended int64, bytesRead uint64, err error) {
-	db, err := sql.Open("duckdb", dsn)
-	if err != nil {
-		return 0, 0, fmt.Errorf("failed to start a SQL client for append(%q): %w", "duckdb", err)
-	}
-	defer db.Close()
-
-	if err = db.Ping(); err != nil {
-		return 0, 0, fmt.Errorf("failed to validate the DB connection for append(%q): %w", "duckdb", err)
-	}
-
+func Append(ctx context.Context, db *sql.DB, database string, schema string, table string, input io.Reader) (rowsAppended int64, bytesRead uint64, err error) {
 	conn, err := db.Conn(ctx)
 	if err != nil {
-		return 0, 0, fmt.Errorf("failed to get a connection for append(%q): %w", "duckdb", err)
+		return 0, 0, fmt.Errorf("failed to get a connection: %w", err)
 	}
 	defer conn.Close()
 
 	columnMetadata, err := utils.GetColumnMetadata(ctx, conn, database, schema, table)
 	if err != nil {
-		return 0, 0, fmt.Errorf("failed to get column metadata for append(%q): %w", "duckdb", err)
+		return 0, 0, fmt.Errorf("failed to get column metadata: %w", err)
 	}
 
 	var appender *duckdb.Appender
@@ -115,23 +97,20 @@ func Append(ctx context.Context, dsn string, database string, schema string, tab
 		return nil
 	})
 	if err != nil {
-		return 0, 0, fmt.Errorf("failed to create an appender(%q): %w", "duckdb", err)
+		return 0, 0, fmt.Errorf("failed to create an appender: %w", err)
 	}
 	defer appender.Close()
 
-	// Stream NDJSON from request body
 	scanner := bufio.NewScanner(input)
-	// Increase buffer size to handle large rows (default is 64KB)
-	// Set to 4MB to accommodate very large JSON lines
-	maxBufferSize := 4 * 1024 * 1024 // 4MB
-	buf := make([]byte, 0, 64*1024)  // Initial buffer size
+	maxBufferSize := 4 * 1024 * 1024
+	buf := make([]byte, 0, 64*1024)
 	scanner.Buffer(buf, maxBufferSize)
 	var bytesSinceFlush uint64
 
 	for scanner.Scan() {
 		line := scanner.Bytes()
 		if len(line) == 0 {
-			continue // Skip empty lines
+			continue
 		}
 
 		lineBytes := uint64(len(line))
@@ -161,13 +140,12 @@ func Append(ctx context.Context, dsn string, database string, schema string, tab
 
 		rowsAppended++
 
-		// Flush if we've reached row limit OR bytes limit
 		if rowsAppended%flushInterval == 0 || bytesSinceFlush >= flushBytesLimit {
 			slog.Info("flushing appender", slog.Int64("rowsAppended", rowsAppended), slog.Uint64("bytesRead", bytesRead), slog.Uint64("bytesSinceFlush", bytesSinceFlush))
 			if err := appender.Flush(); err != nil {
 				return 0, 0, fmt.Errorf("failed to flush appender: %w", err)
 			}
-			bytesSinceFlush = 0 // Reset counter after flush
+			bytesSinceFlush = 0
 		}
 	}
 

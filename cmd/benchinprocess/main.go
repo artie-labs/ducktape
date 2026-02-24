@@ -123,8 +123,7 @@ func main() {
 			// HTTP client buffers provide decoupling between writer and reader
 			bufferedReader := bufio.NewReaderSize(pr, ducktape.RecommendedBufferSize)
 
-			// Call api.Append() directly
-			rowsAppended, bytesRead, err := api.Append(ctx, *dsn, *database, *schema, *table, bufferedReader)
+			rowsAppended, bytesRead, err := api.Append(ctx, db, *database, *schema, *table, bufferedReader)
 			workerElapsed := time.Since(startTime)
 
 			// Atomically update counters after append is done

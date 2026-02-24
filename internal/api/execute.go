@@ -9,28 +9,21 @@ import (
 	"time"
 
 	"github.com/artie-labs/ducktape/api/pkg/ducktape"
-	_ "github.com/duckdb/duckdb-go/v2"
 )
 
 func handleExecute(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
-	dsn := r.Header.Get(ducktape.DuckDBConnectionStringHeader)
-	if dsn == "" {
-		err := fmt.Errorf("%q header is required", ducktape.DuckDBConnectionStringHeader)
-		errMsg := err.Error()
-		handleBadRequestJSON(w, ducktape.QueryResponse{Error: &errMsg}, err)
-		return
-	}
-
 	request, err := getRequestBody[ducktape.ExecuteRequest](r)
 	if err != nil {
 		errMsg := err.Error()
 		handleBadRequestJSON(w, ducktape.QueryResponse{Error: &errMsg}, err)
 		return
 	}
-	ctx := r.Context()
 
-	result, err := Execute(ctx, dsn, request)
+	ctx := r.Context()
+	db := DBFromContext(ctx)
+
+	result, err := Execute(ctx, db, request)
 	if err != nil {
 		errMsg := err.Error()
 		handleInternalServerErrorJSON(w, ducktape.ExecuteResponse{Error: &errMsg}, err)
@@ -60,24 +53,14 @@ func handleExecute(w http.ResponseWriter, r *http.Request) {
 	slog.Debug("execution results", slog.Any("rows affected", rowsAffected), slog.Duration("elapsed", time.Since(start)))
 }
 
-func Execute(ctx context.Context, dsn string, request ducktape.ExecuteRequest) (sql.Result, error) {
+func Execute(ctx context.Context, db *sql.DB, request ducktape.ExecuteRequest) (sql.Result, error) {
 	if len(request.Statements) == 0 {
 		return nil, fmt.Errorf("at least one statement is required")
 	}
 
-	db, err := sql.Open("duckdb", dsn)
-	if err != nil {
-		return nil, fmt.Errorf("failed to start a SQL client for execute(%q): %w", "duckdb", err)
-	}
-	defer db.Close()
-
-	if err = db.Ping(); err != nil {
-		return nil, fmt.Errorf("failed to validate the DB connection for execute(%q): %w", "duckdb", err)
-	}
-
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to begin a transaction for execute(%q): %w", "duckdb", err)
+		return nil, fmt.Errorf("failed to begin a transaction: %w", err)
 	}
 	defer tx.Rollback()
 

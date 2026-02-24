@@ -21,9 +21,10 @@ func TestAppend(t *testing.T) {
 	t.Run("append basic data", func(t *testing.T) {
 		dsn := "test_append_basic.db"
 		t.Cleanup(func() { os.Remove(dsn) })
+		db := openTestDB(t, dsn)
 
 		// Create table
-		_, err := Execute(ctx, dsn, ducktape.ExecuteRequest{
+		_, err := Execute(ctx, db, ducktape.ExecuteRequest{
 			Statements: []ducktape.ExecuteStatement{
 				{Query: `CREATE TABLE test_append_basic (id INTEGER, name VARCHAR, age INTEGER)`},
 			},
@@ -38,7 +39,7 @@ func TestAppend(t *testing.T) {
 {"rv":[3,"Charlie",35]}`
 
 		reader := strings.NewReader(ndjson)
-		rowsAppended, bytesRead, err := Append(ctx, dsn, "test_append_basic", "main", "test_append_basic", reader)
+		rowsAppended, bytesRead, err := Append(ctx, db, "test_append_basic", "main", "test_append_basic", reader)
 		if err != nil {
 			t.Fatalf("failed to append: %v", err)
 		}
@@ -52,7 +53,7 @@ func TestAppend(t *testing.T) {
 		}
 
 		// Verify data was inserted
-		result, err := Query(ctx, dsn, ducktape.QueryRequest{
+		result, err := Query(ctx, db, ducktape.QueryRequest{
 			Query: "SELECT * FROM test_append_basic ORDER BY id",
 		})
 		if err != nil {
@@ -71,8 +72,9 @@ func TestAppend(t *testing.T) {
 	t.Run("append with empty lines", func(t *testing.T) {
 		dsn := "test_append_empty_lines.db"
 		t.Cleanup(func() { os.Remove(dsn) })
+		db := openTestDB(t, dsn)
 
-		_, err := Execute(ctx, dsn, ducktape.ExecuteRequest{
+		_, err := Execute(ctx, db, ducktape.ExecuteRequest{
 			Statements: []ducktape.ExecuteStatement{
 				{Query: `CREATE TABLE test_append_empty_lines (id INTEGER, value VARCHAR)`},
 			},
@@ -89,7 +91,7 @@ func TestAppend(t *testing.T) {
 {"rv":[3,"c"]}`
 
 		reader := strings.NewReader(ndjson)
-		rowsAppended, _, err := Append(ctx, dsn, "test_append_empty_lines", "main", "test_append_empty_lines", reader)
+		rowsAppended, _, err := Append(ctx, db, "test_append_empty_lines", "main", "test_append_empty_lines", reader)
 		if err != nil {
 			t.Fatalf("failed to append: %v", err)
 		}
@@ -102,8 +104,9 @@ func TestAppend(t *testing.T) {
 	t.Run("append with temporal types", func(t *testing.T) {
 		dsn := "test_append_temporal.db"
 		t.Cleanup(func() { os.Remove(dsn) })
+		db := openTestDB(t, dsn)
 
-		_, err := Execute(ctx, dsn, ducktape.ExecuteRequest{
+		_, err := Execute(ctx, db, ducktape.ExecuteRequest{
 			Statements: []ducktape.ExecuteStatement{
 				{Query: `CREATE TABLE test_append_temporal (
 				id INTEGER,
@@ -120,7 +123,7 @@ func TestAppend(t *testing.T) {
 		ndjson := `{"rv":[1,"2024-03-15","2024-03-15T14:30:00","14:30:00"]}`
 
 		reader := strings.NewReader(ndjson)
-		rowsAppended, _, err := Append(ctx, dsn, "test_append_temporal", "main", "test_append_temporal", reader)
+		rowsAppended, _, err := Append(ctx, db, "test_append_temporal", "main", "test_append_temporal", reader)
 		if err != nil {
 			t.Fatalf("failed to append temporal data: %v", err)
 		}
@@ -130,7 +133,7 @@ func TestAppend(t *testing.T) {
 		}
 
 		// Verify data
-		result, err := Query(ctx, dsn, ducktape.QueryRequest{
+		result, err := Query(ctx, db, ducktape.QueryRequest{
 			Query: "SELECT * FROM test_append_temporal",
 		})
 		if err != nil {
@@ -149,8 +152,9 @@ func TestAppend(t *testing.T) {
 	t.Run("append with NULL values", func(t *testing.T) {
 		dsn := "test_append_nulls.db"
 		t.Cleanup(func() { os.Remove(dsn) })
+		db := openTestDB(t, dsn)
 
-		_, err := Execute(ctx, dsn, ducktape.ExecuteRequest{
+		_, err := Execute(ctx, db, ducktape.ExecuteRequest{
 			Statements: []ducktape.ExecuteStatement{
 				{Query: `CREATE TABLE test_append_nulls (id INTEGER, value VARCHAR, count INTEGER)`},
 			},
@@ -163,7 +167,7 @@ func TestAppend(t *testing.T) {
 {"rv":[2,"test",null]}`
 
 		reader := strings.NewReader(ndjson)
-		rowsAppended, _, err := Append(ctx, dsn, "test_append_nulls", "main", "test_append_nulls", reader)
+		rowsAppended, _, err := Append(ctx, db, "test_append_nulls", "main", "test_append_nulls", reader)
 		if err != nil {
 			t.Fatalf("failed to append: %v", err)
 		}
@@ -172,7 +176,7 @@ func TestAppend(t *testing.T) {
 			t.Errorf("expected 2 rows appended, got %d", rowsAppended)
 		}
 
-		result, err := Query(ctx, dsn, ducktape.QueryRequest{
+		result, err := Query(ctx, db, ducktape.QueryRequest{
 			Query: "SELECT * FROM test_append_nulls ORDER BY id",
 		})
 		if err != nil {
@@ -191,8 +195,9 @@ func TestAppend(t *testing.T) {
 	t.Run("append with boolean values", func(t *testing.T) {
 		dsn := "test_append_boolean.db"
 		t.Cleanup(func() { os.Remove(dsn) })
+		db := openTestDB(t, dsn)
 
-		_, err := Execute(ctx, dsn, ducktape.ExecuteRequest{
+		_, err := Execute(ctx, db, ducktape.ExecuteRequest{
 			Statements: []ducktape.ExecuteStatement{
 				{Query: `CREATE TABLE test_append_boolean (id INTEGER, active BOOLEAN, verified BOOLEAN)`},
 			},
@@ -205,7 +210,7 @@ func TestAppend(t *testing.T) {
 {"rv":[2,false,true]}`
 
 		reader := strings.NewReader(ndjson)
-		rowsAppended, _, err := Append(ctx, dsn, "test_append_boolean", "main", "test_append_boolean", reader)
+		rowsAppended, _, err := Append(ctx, db, "test_append_boolean", "main", "test_append_boolean", reader)
 		if err != nil {
 			t.Fatalf("failed to append: %v", err)
 		}
@@ -214,7 +219,7 @@ func TestAppend(t *testing.T) {
 			t.Errorf("expected 2 rows appended, got %d", rowsAppended)
 		}
 
-		result, err := Query(ctx, dsn, ducktape.QueryRequest{
+		result, err := Query(ctx, db, ducktape.QueryRequest{
 			Query: "SELECT * FROM test_append_boolean ORDER BY id",
 		})
 		if err != nil {
@@ -233,8 +238,9 @@ func TestAppend(t *testing.T) {
 	t.Run("invalid JSON", func(t *testing.T) {
 		dsn := "test_append_invalid.db"
 		t.Cleanup(func() { os.Remove(dsn) })
+		db := openTestDB(t, dsn)
 
-		_, err := Execute(ctx, dsn, ducktape.ExecuteRequest{
+		_, err := Execute(ctx, db, ducktape.ExecuteRequest{
 			Statements: []ducktape.ExecuteStatement{
 				{Query: `CREATE TABLE test_append_invalid (id INTEGER, name VARCHAR)`},
 			},
@@ -246,7 +252,7 @@ func TestAppend(t *testing.T) {
 		ndjson := `{invalid json}`
 
 		reader := strings.NewReader(ndjson)
-		_, _, err = Append(ctx, dsn, "test_append_invalid", "main", "test_append_invalid", reader)
+		_, _, err = Append(ctx, db, "test_append_invalid", "main", "test_append_invalid", reader)
 		if err == nil {
 			t.Error("expected error for invalid JSON, got none")
 		}
@@ -257,9 +263,10 @@ func TestAppend(t *testing.T) {
 
 	t.Run("non-existent table", func(t *testing.T) {
 		ndjson := `{"rv":[1,"test"]}`
+		db := openTestDB(t, "")
 
 		reader := strings.NewReader(ndjson)
-		_, _, err := Append(ctx, "", "memory", "main", "non_existent_table", reader)
+		_, _, err := Append(ctx, db, "memory", "main", "non_existent_table", reader)
 		if err == nil {
 			t.Error("expected error for non-existent table, got none")
 		}
@@ -268,8 +275,9 @@ func TestAppend(t *testing.T) {
 	t.Run("column count mismatch", func(t *testing.T) {
 		dsn := "test_append_mismatch.db"
 		t.Cleanup(func() { os.Remove(dsn) })
+		db := openTestDB(t, dsn)
 
-		_, err := Execute(ctx, dsn, ducktape.ExecuteRequest{
+		_, err := Execute(ctx, db, ducktape.ExecuteRequest{
 			Statements: []ducktape.ExecuteStatement{
 				{Query: `CREATE TABLE test_append_mismatch (id INTEGER, name VARCHAR)`},
 			},
@@ -282,7 +290,7 @@ func TestAppend(t *testing.T) {
 		ndjson := `{"rv":[1,"test","extra"]}`
 
 		reader := strings.NewReader(ndjson)
-		_, _, err = Append(ctx, dsn, "test_append_mismatch", "main", "test_append_mismatch", reader)
+		_, _, err = Append(ctx, db, "test_append_mismatch", "main", "test_append_mismatch", reader)
 		if err == nil {
 			t.Error("expected error for column count mismatch, got none")
 		}
@@ -294,8 +302,9 @@ func TestAppend(t *testing.T) {
 	t.Run("empty input", func(t *testing.T) {
 		dsn := "test_append_empty.db"
 		t.Cleanup(func() { os.Remove(dsn) })
+		db := openTestDB(t, dsn)
 
-		_, err := Execute(ctx, dsn, ducktape.ExecuteRequest{
+		_, err := Execute(ctx, db, ducktape.ExecuteRequest{
 			Statements: []ducktape.ExecuteStatement{
 				{Query: `CREATE TABLE test_append_empty (id INTEGER, name VARCHAR)`},
 			},
@@ -305,7 +314,7 @@ func TestAppend(t *testing.T) {
 		}
 
 		reader := strings.NewReader("")
-		rowsAppended, _, err := Append(ctx, dsn, "test_append_empty", "main", "test_append_empty", reader)
+		rowsAppended, _, err := Append(ctx, db, "test_append_empty", "main", "test_append_empty", reader)
 		if err != nil {
 			t.Fatalf("failed to append empty data: %v", err)
 		}
@@ -318,8 +327,9 @@ func TestAppend(t *testing.T) {
 	t.Run("large batch", func(t *testing.T) {
 		dsn := "test_append_large.db"
 		t.Cleanup(func() { os.Remove(dsn) })
+		db := openTestDB(t, dsn)
 
-		_, err := Execute(ctx, dsn, ducktape.ExecuteRequest{
+		_, err := Execute(ctx, db, ducktape.ExecuteRequest{
 			Statements: []ducktape.ExecuteStatement{
 				{Query: `CREATE TABLE test_append_large (id INTEGER, value DOUBLE)`},
 			},
@@ -336,7 +346,7 @@ func TestAppend(t *testing.T) {
 		}
 
 		reader := bytes.NewReader(buf.Bytes())
-		rowsAppended, bytesRead, err := Append(ctx, dsn, "test_append_large", "main", "test_append_large", reader)
+		rowsAppended, bytesRead, err := Append(ctx, db, "test_append_large", "main", "test_append_large", reader)
 		if err != nil {
 			t.Fatalf("failed to append large batch: %v", err)
 		}
@@ -350,7 +360,7 @@ func TestAppend(t *testing.T) {
 		}
 
 		// Verify count
-		result, err := Query(ctx, dsn, ducktape.QueryRequest{
+		result, err := Query(ctx, db, ducktape.QueryRequest{
 			Query: "SELECT COUNT(*) as count FROM test_append_large",
 		})
 		if err != nil {
@@ -377,7 +387,8 @@ func BenchmarkAppend(b *testing.B) {
 	fullyQualifiedTableName := fmt.Sprintf("%s.%s.%s", databaseName, schemaName, tableName)
 	b.Cleanup(func() { os.Remove(dsn) })
 
-	_, err := Execute(ctx, dsn, ducktape.ExecuteRequest{
+	db := openTestDB(b, dsn)
+	_, err := Execute(ctx, db, ducktape.ExecuteRequest{
 		Statements: []ducktape.ExecuteStatement{
 			{Query: fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %s; CREATE TABLE %s (id BIGINT, name VARCHAR);", schemaName, fullyQualifiedTableName)},
 		},
@@ -438,8 +449,8 @@ func BenchmarkAppend_1KB_Local(b *testing.B) {
 
 	b.Cleanup(func() { os.Remove(dsn) })
 
-	// Schema mimics typical production: id, timestamps, metadata, small payload
-	_, err := Execute(ctx, dsn, ducktape.ExecuteRequest{
+	db := openTestDB(b, dsn)
+	_, err := Execute(ctx, db, ducktape.ExecuteRequest{
 		Statements: []ducktape.ExecuteStatement{
 			{Query: fmt.Sprintf(`CREATE SCHEMA IF NOT EXISTS %s;
 				CREATE TABLE %s (
@@ -516,7 +527,8 @@ func BenchmarkAppend_64KB_Local(b *testing.B) {
 
 	b.Cleanup(func() { os.Remove(dsn) })
 
-	_, err := Execute(ctx, dsn, ducktape.ExecuteRequest{
+	db := openTestDB(b, dsn)
+	_, err := Execute(ctx, db, ducktape.ExecuteRequest{
 		Statements: []ducktape.ExecuteStatement{
 			{Query: fmt.Sprintf(`CREATE SCHEMA IF NOT EXISTS %s;
 				CREATE TABLE %s (

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"database/sql"
 	"fmt"
 	"io"
 	"log/slog"
@@ -9,6 +10,7 @@ import (
 	jsoniter "github.com/json-iterator/go"
 
 	"github.com/artie-labs/ducktape/api/pkg/ducktape"
+	_ "github.com/duckdb/duckdb-go/v2"
 )
 
 var json = jsoniter.ConfigCompatibleWithStandardLibrary
@@ -21,10 +23,32 @@ func RegisterHealthCheckRoutes(mux *http.ServeMux) {
 }
 
 func RegisterApiRoutes(mux *http.ServeMux) {
-	mux.HandleFunc(fmt.Sprintf("POST %s", ducktape.ExecuteRoute), handleExecute)
-	mux.HandleFunc(fmt.Sprintf("POST %s", ducktape.QueryRoute), handleQuery)
-	mux.HandleFunc(fmt.Sprintf("POST %s", ducktape.AppendRoute), handleAppend)
-	mux.HandleFunc(fmt.Sprintf("GET %s", ducktape.PingRoute), handlePing)
+	mux.HandleFunc(fmt.Sprintf("POST %s", ducktape.ExecuteRoute), withDB(handleExecute))
+	mux.HandleFunc(fmt.Sprintf("POST %s", ducktape.QueryRoute), withDB(handleQuery))
+	mux.HandleFunc(fmt.Sprintf("POST %s", ducktape.AppendRoute), withDB(handleAppend))
+	mux.HandleFunc(fmt.Sprintf("GET %s", ducktape.PingRoute), withDB(handlePing))
+}
+
+func withDB(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		dsn := r.Header.Get(ducktape.DuckDBConnectionStringHeader)
+		if dsn == "" {
+			err := fmt.Errorf("%q header is required", ducktape.DuckDBConnectionStringHeader)
+			errMsg := err.Error()
+			handleBadRequestJSON(w, ducktape.QueryResponse{Error: &errMsg}, err)
+			return
+		}
+
+		db, err := sql.Open("duckdb", dsn)
+		if err != nil {
+			errMsg := err.Error()
+			handleInternalServerErrorJSON(w, ducktape.QueryResponse{Error: &errMsg}, err)
+			return
+		}
+		defer db.Close()
+
+		next(w, r.WithContext(WithDB(r.Context(), db)))
+	}
 }
 
 func getRequestBody[T any](r *http.Request) (T, error) {

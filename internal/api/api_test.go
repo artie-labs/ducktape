@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"database/sql"
 	"os"
 	"testing"
 
@@ -9,15 +10,26 @@ import (
 	_ "github.com/duckdb/duckdb-go/v2"
 )
 
+func openTestDB(t testing.TB, dsn string) *sql.DB {
+	t.Helper()
+	db, err := sql.Open("duckdb", dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	return db
+}
+
 func TestQueryExecuteIntegration(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("create insert and query", func(t *testing.T) {
 		dsn := "test_integration.db"
 		t.Cleanup(func() { os.Remove(dsn) })
+		db := openTestDB(t, dsn)
 
 		// Create
-		_, err := Execute(ctx, dsn, ducktape.ExecuteRequest{
+		_, err := Execute(ctx, db, ducktape.ExecuteRequest{
 			Statements: []ducktape.ExecuteStatement{
 				{Query: `CREATE TABLE test_integration (id INTEGER, name VARCHAR, score DOUBLE)`},
 			},
@@ -27,7 +39,7 @@ func TestQueryExecuteIntegration(t *testing.T) {
 		}
 
 		// Insert
-		_, err = Execute(ctx, dsn, ducktape.ExecuteRequest{
+		_, err = Execute(ctx, db, ducktape.ExecuteRequest{
 			Statements: []ducktape.ExecuteStatement{
 				{Query: "INSERT INTO test_integration VALUES (?, ?, ?)", Args: []any{1, "test", 95.5}},
 			},
@@ -37,7 +49,7 @@ func TestQueryExecuteIntegration(t *testing.T) {
 		}
 
 		// Query
-		result, err := Query(ctx, dsn, ducktape.QueryRequest{
+		result, err := Query(ctx, db, ducktape.QueryRequest{
 			Query: "SELECT * FROM test_integration WHERE id = ?",
 			Args:  []any{1},
 		})
@@ -59,12 +71,13 @@ func TestContextCancellation(t *testing.T) {
 	t.Run("Execute with cancelled context", func(t *testing.T) {
 		dsn := "test_context_cancel_exec.db"
 		t.Cleanup(func() { os.Remove(dsn) })
+		db := openTestDB(t, dsn)
 
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel() // Cancel immediately
 
 		// Create a table first
-		_, err := Execute(context.Background(), dsn, ducktape.ExecuteRequest{
+		_, err := Execute(context.Background(), db, ducktape.ExecuteRequest{
 			Statements: []ducktape.ExecuteStatement{
 				{Query: "CREATE TABLE test_cancel (id INTEGER)"},
 			},
@@ -74,7 +87,7 @@ func TestContextCancellation(t *testing.T) {
 		}
 
 		// This may or may not fail depending on timing, but should not panic
-		_, _ = Execute(ctx, dsn, ducktape.ExecuteRequest{
+		_, _ = Execute(ctx, db, ducktape.ExecuteRequest{
 			Statements: []ducktape.ExecuteStatement{
 				{Query: "INSERT INTO test_cancel VALUES (1)"},
 			},
@@ -84,12 +97,13 @@ func TestContextCancellation(t *testing.T) {
 	t.Run("Query with cancelled context", func(t *testing.T) {
 		dsn := "test_context_cancel_query.db"
 		t.Cleanup(func() { os.Remove(dsn) })
+		db := openTestDB(t, dsn)
 
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel() // Cancel immediately
 
 		// This may or may not fail depending on timing, but should not panic
-		_, _ = Query(ctx, dsn, ducktape.QueryRequest{
+		_, _ = Query(ctx, db, ducktape.QueryRequest{
 			Query: "SELECT 1",
 		})
 	})
