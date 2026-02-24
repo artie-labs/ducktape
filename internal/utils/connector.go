@@ -30,7 +30,15 @@ func NewConnector(dsn string) (*Connector, error) {
 		params.Del("motherduck_token")
 	}
 
-	c, err := duckdb.NewConnector(fmt.Sprintf(":memory:?%s", params.Encode()), func(execer driver.ExecerContext) error {
+	encodedParams := params.Encode()
+	var inMemoryDSN string
+	if encodedParams != "" {
+		inMemoryDSN = fmt.Sprintf(":memory:?%s", encodedParams)
+	} else {
+		inMemoryDSN = ":memory:"
+	}
+
+	c, err := duckdb.NewConnector(inMemoryDSN, func(execer driver.ExecerContext) error {
 		bootQueries := []string{
 			`INSTALL motherduck`,
 			`LOAD motherduck`,
