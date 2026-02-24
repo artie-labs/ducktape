@@ -148,7 +148,6 @@ func Append(ctx context.Context, dsn string, database string, schema string, tab
 			if i >= len(columnMetadata) {
 				return 0, 0, fmt.Errorf("value index %d exceeds number of columns %d", i, len(columnMetadata))
 			}
-			slog.Info("converting value", slog.String("column", columnMetadata[i].Name), slog.String("columnType", columnMetadata[i].Type), slog.String("valueType", fmt.Sprintf("%T", v)), slog.Any("value", v))
 			convertedValue, err := utils.ConvertValue(v, columnMetadata[i])
 			if err != nil {
 				return 0, 0, fmt.Errorf("failed to convert value while appending: %w", err)
