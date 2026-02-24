@@ -3,10 +3,12 @@ package utils
 import (
 	"context"
 	"database/sql"
+	"math/big"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/duckdb/duckdb-go/v2"
 	_ "github.com/duckdb/duckdb-go/v2"
 )
 
@@ -666,6 +668,137 @@ func TestConvertValue(t *testing.T) {
 		if result != now {
 			t.Errorf("expected %v, got %v", now, result)
 		}
+	})
+
+	t.Run("DECIMAL type conversions", func(t *testing.T) {
+		t.Run("basic decimal", func(t *testing.T) {
+			metadata := ColumnMetadata{Name: "price", Type: "DECIMAL(10,2)"}
+			result, err := ConvertValue("123.45", metadata)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			d, ok := result.(duckdb.Decimal)
+			if !ok {
+				t.Fatalf("expected duckdb.Decimal, got %T", result)
+			}
+			if d.Width != 10 || d.Scale != 2 {
+				t.Errorf("expected width=10, scale=2, got width=%d, scale=%d", d.Width, d.Scale)
+			}
+			if d.Value.Cmp(big.NewInt(12345)) != 0 {
+				t.Errorf("expected unscaled value 12345, got %s", d.Value.String())
+			}
+		})
+
+		t.Run("integer string with scale", func(t *testing.T) {
+			metadata := ColumnMetadata{Name: "amount", Type: "DECIMAL(15,3)"}
+			result, err := ConvertValue("42", metadata)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			d := result.(duckdb.Decimal)
+			if d.Value.Cmp(big.NewInt(42000)) != 0 {
+				t.Errorf("expected unscaled value 42000, got %s", d.Value.String())
+			}
+		})
+
+		t.Run("negative decimal", func(t *testing.T) {
+			metadata := ColumnMetadata{Name: "balance", Type: "DECIMAL(10,2)"}
+			result, err := ConvertValue("-99.99", metadata)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			d := result.(duckdb.Decimal)
+			if d.Value.Cmp(big.NewInt(-9999)) != 0 {
+				t.Errorf("expected unscaled value -9999, got %s", d.Value.String())
+			}
+		})
+
+		t.Run("zero scale", func(t *testing.T) {
+			metadata := ColumnMetadata{Name: "count", Type: "NUMERIC(10,0)"}
+			result, err := ConvertValue("12345", metadata)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			d := result.(duckdb.Decimal)
+			if d.Value.Cmp(big.NewInt(12345)) != 0 {
+				t.Errorf("expected unscaled value 12345, got %s", d.Value.String())
+			}
+		})
+
+		t.Run("high precision value", func(t *testing.T) {
+			metadata := ColumnMetadata{Name: "precise", Type: "DECIMAL(38,18)"}
+			result, err := ConvertValue("12345678901234567890.123456789012345678", metadata)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			d := result.(duckdb.Decimal)
+			expected, _ := new(big.Int).SetString("12345678901234567890123456789012345678", 10)
+			if d.Value.Cmp(expected) != 0 {
+				t.Errorf("expected %s, got %s", expected.String(), d.Value.String())
+			}
+		})
+
+		t.Run("fractional part shorter than scale", func(t *testing.T) {
+			metadata := ColumnMetadata{Name: "val", Type: "DECIMAL(10,4)"}
+			result, err := ConvertValue("1.5", metadata)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			d := result.(duckdb.Decimal)
+			if d.Value.Cmp(big.NewInt(15000)) != 0 {
+				t.Errorf("expected unscaled value 15000, got %s", d.Value.String())
+			}
+		})
+
+		t.Run("fractional part longer than scale truncates", func(t *testing.T) {
+			metadata := ColumnMetadata{Name: "val", Type: "DECIMAL(10,2)"}
+			result, err := ConvertValue("1.999", metadata)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			d := result.(duckdb.Decimal)
+			if d.Value.Cmp(big.NewInt(199)) != 0 {
+				t.Errorf("expected unscaled value 199, got %s", d.Value.String())
+			}
+		})
+
+		t.Run("nil value", func(t *testing.T) {
+			metadata := ColumnMetadata{Name: "val", Type: "DECIMAL(10,2)"}
+			result, err := ConvertValue(nil, metadata)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if result != nil {
+				t.Errorf("expected nil, got %v", result)
+			}
+		})
+
+		t.Run("non-string value passes through", func(t *testing.T) {
+			metadata := ColumnMetadata{Name: "val", Type: "DECIMAL(10,2)"}
+			result, err := ConvertValue(float64(3.14), metadata)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if result != float64(3.14) {
+				t.Errorf("expected 3.14, got %v", result)
+			}
+		})
+
+		t.Run("invalid string", func(t *testing.T) {
+			metadata := ColumnMetadata{Name: "val", Type: "DECIMAL(10,2)"}
+			_, err := ConvertValue("not-a-number", metadata)
+			if err == nil {
+				t.Error("expected error but got none")
+			}
+		})
+
+		t.Run("invalid type missing parens", func(t *testing.T) {
+			metadata := ColumnMetadata{Name: "val", Type: "DECIMAL"}
+			_, err := ConvertValue("123", metadata)
+			if err == nil {
+				t.Error("expected error but got none")
+			}
+		})
 	})
 
 	t.Run("edge cases and error messages", func(t *testing.T) {

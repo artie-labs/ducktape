@@ -5,9 +5,12 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"fmt"
+	"math/big"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/duckdb/duckdb-go/v2"
 )
 
 func RowsToObjects(rows *sql.Rows) ([]map[string]any, error) {
@@ -148,11 +151,15 @@ func ConvertValue(value any, columnMetadata ColumnMetadata) (driver.Value, error
 		// Handle parameterized types like DECIMAL(15,2), NUMERIC(10,0)
 		if strings.HasPrefix(columnMetadata.Type, "DECIMAL") || strings.HasPrefix(columnMetadata.Type, "NUMERIC") {
 			if s, ok := value.(string); ok {
-				parsed, err := strconv.ParseFloat(s, 64)
+				width, scale, err := parseDecimalType(columnMetadata.Type)
 				if err != nil {
-					return 0, fmt.Errorf("failed to parse string to float64 for decimal column: %w", err)
+					return nil, fmt.Errorf("failed to parse decimal type %q: %w", columnMetadata.Type, err)
 				}
-				return parsed, nil
+				unscaled, err := parseDecimalString(s, scale)
+				if err != nil {
+					return nil, fmt.Errorf("failed to parse decimal value %q for column %q: %w", s, columnMetadata.Name, err)
+				}
+				return duckdb.Decimal{Width: width, Scale: scale, Value: unscaled}, nil
 			}
 			return value, nil
 		}
@@ -160,4 +167,49 @@ func ConvertValue(value any, columnMetadata ColumnMetadata) (driver.Value, error
 		// The driver will handle basic conversions
 		return value, nil
 	}
+}
+
+func parseDecimalType(typ string) (width uint8, scale uint8, err error) {
+	start := strings.IndexByte(typ, '(')
+	end := strings.IndexByte(typ, ')')
+	if start == -1 || end == -1 {
+		return 0, 0, fmt.Errorf("missing (width,scale) in type %q", typ)
+	}
+	parts := strings.SplitN(typ[start+1:end], ",", 2)
+	if len(parts) != 2 {
+		return 0, 0, fmt.Errorf("expected (width,scale) in type %q", typ)
+	}
+	w, err := strconv.ParseUint(strings.TrimSpace(parts[0]), 10, 8)
+	if err != nil {
+		return 0, 0, fmt.Errorf("invalid width in type %q: %w", typ, err)
+	}
+	s, err := strconv.ParseUint(strings.TrimSpace(parts[1]), 10, 8)
+	if err != nil {
+		return 0, 0, fmt.Errorf("invalid scale in type %q: %w", typ, err)
+	}
+	return uint8(w), uint8(s), nil
+}
+
+// parseDecimalString converts a decimal string like "123.45" into the unscaled
+// *big.Int representation for the given scale (e.g. scale=2 → 12345).
+func parseDecimalString(s string, scale uint8) (*big.Int, error) {
+	parts := strings.SplitN(s, ".", 2)
+	intPart := parts[0]
+	var fracPart string
+	if len(parts) == 2 {
+		fracPart = parts[1]
+	}
+
+	if len(fracPart) < int(scale) {
+		fracPart += strings.Repeat("0", int(scale)-len(fracPart))
+	} else if len(fracPart) > int(scale) {
+		fracPart = fracPart[:scale]
+	}
+
+	unscaled := intPart + fracPart
+	result, ok := new(big.Int).SetString(unscaled, 10)
+	if !ok {
+		return nil, fmt.Errorf("failed to parse %q as integer", unscaled)
+	}
+	return result, nil
 }
