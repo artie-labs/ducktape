@@ -86,18 +86,6 @@ func ConvertValue(value any, columnMetadata ColumnMetadata) (driver.Value, error
 		return nil, nil
 	}
 
-	// Handle parameterized types like DECIMAL(15,2), NUMERIC(10,0)
-	if strings.HasPrefix(columnMetadata.Type, "DECIMAL") || strings.HasPrefix(columnMetadata.Type, "NUMERIC") {
-		if s, ok := value.(string); ok {
-			parsed, err := strconv.ParseFloat(s, 64)
-			if err != nil {
-				return 0, fmt.Errorf("failed to parse string to float64 for decimal column: %w", err)
-			}
-			return parsed, nil
-		}
-		return value, nil
-	}
-
 	switch columnMetadata.Type {
 	case "DATE":
 		// Handle date strings (may include timestamp portion)
@@ -156,25 +144,18 @@ func ConvertValue(value any, columnMetadata ColumnMetadata) (driver.Value, error
 			return nil, fmt.Errorf("failed to parse time %q for column %q (expected type %s)", s, columnMetadata.Name, columnMetadata.Type)
 		}
 		return value, nil
-	case "BIGINT", "INT8", "LONG", "INTEGER", "INT4", "INT", "SIGNED", "SMALLINT", "INT2", "SHORT", "TINYINT", "INT1":
-		if s, ok := value.(string); ok {
-			parsed, err := strconv.ParseInt(s, 10, 64)
-			if err != nil {
-				return 0, fmt.Errorf("failed to parse string to int64: %w", err)
-			}
-			return parsed, nil
-		}
-		return value, nil
-	case "DOUBLE", "FLOAT8", "FLOAT", "FLOAT4", "REAL":
-		if s, ok := value.(string); ok {
-			parsed, err := strconv.ParseFloat(s, 64)
-			if err != nil {
-				return 0, fmt.Errorf("failed to parse string to float64: %w", err)
-			}
-			return parsed, nil
-		}
-		return value, nil
 	default:
+		// Handle parameterized types like DECIMAL(15,2), NUMERIC(10,0)
+		if strings.HasPrefix(columnMetadata.Type, "DECIMAL") || strings.HasPrefix(columnMetadata.Type, "NUMERIC") {
+			if s, ok := value.(string); ok {
+				parsed, err := strconv.ParseFloat(s, 64)
+				if err != nil {
+					return 0, fmt.Errorf("failed to parse string to float64 for decimal column: %w", err)
+				}
+				return parsed, nil
+			}
+			return value, nil
+		}
 		// For all other types (BIGINT, BOOLEAN, VARCHAR, etc.), pass through as-is
 		// The driver will handle basic conversions
 		return value, nil
