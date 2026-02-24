@@ -12,6 +12,10 @@ import (
 	_ "github.com/duckdb/duckdb-go/v2"
 )
 
+func equal(z, x *big.Int) bool {
+	return z.Cmp(x) == 0
+}
+
 func TestRowsToObjects(t *testing.T) {
 	db, err := sql.Open("duckdb", "")
 	if err != nil {
@@ -684,7 +688,7 @@ func TestConvertValue(t *testing.T) {
 			if d.Width != 10 || d.Scale != 2 {
 				t.Errorf("expected width=10, scale=2, got width=%d, scale=%d", d.Width, d.Scale)
 			}
-			if d.Value.Cmp(big.NewInt(12345)) != 0 {
+			if !equal(d.Value, big.NewInt(12345)) {
 				t.Errorf("expected unscaled value 12345, got %s", d.Value.String())
 			}
 		})
@@ -696,7 +700,7 @@ func TestConvertValue(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			d := result.(duckdb.Decimal)
-			if d.Value.Cmp(big.NewInt(42000)) != 0 {
+			if !equal(d.Value, big.NewInt(42000)) {
 				t.Errorf("expected unscaled value 42000, got %s", d.Value.String())
 			}
 		})
@@ -708,7 +712,7 @@ func TestConvertValue(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			d := result.(duckdb.Decimal)
-			if d.Value.Cmp(big.NewInt(-9999)) != 0 {
+			if !equal(d.Value, big.NewInt(-9999)) {
 				t.Errorf("expected unscaled value -9999, got %s", d.Value.String())
 			}
 		})
@@ -720,7 +724,7 @@ func TestConvertValue(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			d := result.(duckdb.Decimal)
-			if d.Value.Cmp(big.NewInt(12345)) != 0 {
+			if !equal(d.Value, big.NewInt(12345)) {
 				t.Errorf("expected unscaled value 12345, got %s", d.Value.String())
 			}
 		})
@@ -733,7 +737,7 @@ func TestConvertValue(t *testing.T) {
 			}
 			d := result.(duckdb.Decimal)
 			expected, _ := new(big.Int).SetString("12345678901234567890123456789012345678", 10)
-			if d.Value.Cmp(expected) != 0 {
+			if !equal(d.Value, expected) {
 				t.Errorf("expected %s, got %s", expected.String(), d.Value.String())
 			}
 		})
@@ -745,7 +749,7 @@ func TestConvertValue(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			d := result.(duckdb.Decimal)
-			if d.Value.Cmp(big.NewInt(15000)) != 0 {
+			if !equal(d.Value, big.NewInt(15000)) {
 				t.Errorf("expected unscaled value 15000, got %s", d.Value.String())
 			}
 		})
@@ -765,7 +769,7 @@ func TestConvertValue(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			d := result.(duckdb.Decimal)
-			if d.Value.Cmp(big.NewInt(199)) != 0 {
+			if !equal(d.Value, big.NewInt(199)) {
 				t.Errorf("expected unscaled value 199, got %s", d.Value.String())
 			}
 		})
@@ -785,7 +789,7 @@ func TestConvertValue(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			d := result.(duckdb.Decimal)
-			if d.Value.Cmp(big.NewInt(12345)) != 0 {
+			if !equal(d.Value, big.NewInt(12345)) {
 				t.Errorf("expected unscaled value 12345, got %s", d.Value.String())
 			}
 		})
