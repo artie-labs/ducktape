@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -55,11 +54,13 @@ func handleQuery(w http.ResponseWriter, r *http.Request) {
 }
 
 func Query(ctx context.Context, dsn string, request ducktape.QueryRequest) ([]map[string]any, error) {
-	db, err := sql.Open("duckdb", dsn)
+	connector, err := utils.NewConnector(dsn)
 	if err != nil {
 		return nil, fmt.Errorf("failed to start a SQL client for queries(%q): %w", "duckdb", err)
 	}
-	defer db.Close()
+	defer connector.Close()
+
+	db := connector.GetDB()
 
 	if err = db.Ping(); err != nil {
 		return nil, fmt.Errorf("failed to validate the DB connection for queries(%q): %w", "duckdb", err)

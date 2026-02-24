@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/artie-labs/ducktape/api/pkg/ducktape"
+	"github.com/artie-labs/ducktape/internal/utils"
 	_ "github.com/duckdb/duckdb-go/v2"
 )
 
@@ -65,11 +66,13 @@ func Execute(ctx context.Context, dsn string, request ducktape.ExecuteRequest) (
 		return nil, fmt.Errorf("at least one statement is required")
 	}
 
-	db, err := sql.Open("duckdb", dsn)
+	connector, err := utils.NewConnector(dsn)
 	if err != nil {
 		return nil, fmt.Errorf("failed to start a SQL client for execute(%q): %w", "duckdb", err)
 	}
-	defer db.Close()
+	defer connector.Close()
+
+	db := connector.GetDB()
 
 	if err = db.Ping(); err != nil {
 		return nil, fmt.Errorf("failed to validate the DB connection for execute(%q): %w", "duckdb", err)
