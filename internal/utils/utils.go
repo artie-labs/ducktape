@@ -89,7 +89,9 @@ func ConvertValue(value any, columnMetadata ColumnMetadata) (driver.Value, error
 		return nil, nil
 	}
 
-	switch columnMetadata.Type {
+	metadataType := strings.ToUpper(strings.TrimSpace(columnMetadata.Type))
+
+	switch metadataType {
 	case "DATE":
 		// Handle date strings (may include timestamp portion)
 		if s, ok := value.(string); ok {
@@ -105,7 +107,7 @@ func ConvertValue(value any, columnMetadata ColumnMetadata) (driver.Value, error
 					return t, nil
 				}
 			}
-			return nil, fmt.Errorf("failed to parse date %q for column %q (expected type %s)", s, columnMetadata.Name, columnMetadata.Type)
+			return nil, fmt.Errorf("failed to parse date %q for column %q (expected type %s)", s, columnMetadata.Name, metadataType)
 		}
 		return value, nil
 
@@ -124,7 +126,7 @@ func ConvertValue(value any, columnMetadata ColumnMetadata) (driver.Value, error
 					return t, nil
 				}
 			}
-			return nil, fmt.Errorf("failed to parse timestamp %q for column %q (expected type %s)", s, columnMetadata.Name, columnMetadata.Type)
+			return nil, fmt.Errorf("failed to parse timestamp %q for column %q (expected type %s)", s, columnMetadata.Name, metadataType)
 		}
 		return value, nil
 
@@ -144,16 +146,16 @@ func ConvertValue(value any, columnMetadata ColumnMetadata) (driver.Value, error
 					return t, nil
 				}
 			}
-			return nil, fmt.Errorf("failed to parse time %q for column %q (expected type %s)", s, columnMetadata.Name, columnMetadata.Type)
+			return nil, fmt.Errorf("failed to parse time %q for column %q (expected type %s)", s, columnMetadata.Name, metadataType)
 		}
 		return value, nil
 	default:
 		// Handle parameterized types like DECIMAL(15,2), NUMERIC(10,0)
-		if strings.HasPrefix(columnMetadata.Type, "DECIMAL") || strings.HasPrefix(columnMetadata.Type, "NUMERIC") {
+		if strings.HasPrefix(metadataType, "DECIMAL") || strings.HasPrefix(metadataType, "NUMERIC") {
 			if s, ok := value.(string); ok {
-				width, scale, err := parseDecimalType(columnMetadata.Type)
+				width, scale, err := parseDecimalType(metadataType)
 				if err != nil {
-					return nil, fmt.Errorf("failed to parse decimal type %q: %w", columnMetadata.Type, err)
+					return nil, fmt.Errorf("failed to parse decimal type %q: %w", metadataType, err)
 				}
 				unscaled, err := parseDecimalString(s, scale)
 				if err != nil {
@@ -193,7 +195,7 @@ func parseDecimalType(typ string) (width uint8, scale uint8, err error) {
 // parseDecimalString converts a decimal string like "123.45" into the unscaled
 // *big.Int representation for the given scale (e.g. scale=2 → 12345).
 func parseDecimalString(s string, scale uint8) (*big.Int, error) {
-	parts := strings.SplitN(s, ".", 2)
+	parts := strings.SplitN(strings.TrimSpace(s), ".", 2)
 	intPart := parts[0]
 	var fracPart string
 	if len(parts) == 2 {
