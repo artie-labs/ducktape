@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
+	"errors"
 	"fmt"
 	"net/url"
 	"strings"
@@ -69,17 +70,18 @@ func (c *Connector) GetDB() *sql.DB {
 }
 
 func (c *Connector) Close() error {
+	var err1, err2 error
 	if c.db != nil {
 		err := c.db.Close()
 		if err != nil {
-			return fmt.Errorf("failed to close database: %w", err)
+			err1 = fmt.Errorf("failed to close database: %w", err)
 		}
 	}
 	if c.connector != nil {
 		err := c.connector.Close()
 		if err != nil {
-			return fmt.Errorf("failed to close connector: %w", err)
+			err2 = fmt.Errorf("failed to close connector: %w", err)
 		}
 	}
-	return nil
+	return errors.Join(err1, err2)
 }
