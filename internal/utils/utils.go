@@ -5,7 +5,12 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"fmt"
+	"math/big"
+	"strconv"
+	"strings"
 	"time"
+
+	"github.com/duckdb/duckdb-go/v2"
 )
 
 func RowsToObjects(rows *sql.Rows) ([]map[string]any, error) {
@@ -84,7 +89,9 @@ func ConvertValue(value any, columnMetadata ColumnMetadata) (driver.Value, error
 		return nil, nil
 	}
 
-	switch columnMetadata.Type {
+	metadataType := strings.ToUpper(strings.TrimSpace(columnMetadata.Type))
+
+	switch metadataType {
 	case "DATE":
 		// Handle date strings (may include timestamp portion)
 		if s, ok := value.(string); ok {
@@ -100,7 +107,7 @@ func ConvertValue(value any, columnMetadata ColumnMetadata) (driver.Value, error
 					return t, nil
 				}
 			}
-			return nil, fmt.Errorf("failed to parse date %q for column %q (expected type %s)", s, columnMetadata.Name, columnMetadata.Type)
+			return nil, fmt.Errorf("failed to parse date %q for column %q (expected type %s)", s, columnMetadata.Name, metadataType)
 		}
 		return value, nil
 
@@ -119,7 +126,7 @@ func ConvertValue(value any, columnMetadata ColumnMetadata) (driver.Value, error
 					return t, nil
 				}
 			}
-			return nil, fmt.Errorf("failed to parse timestamp %q for column %q (expected type %s)", s, columnMetadata.Name, columnMetadata.Type)
+			return nil, fmt.Errorf("failed to parse timestamp %q for column %q (expected type %s)", s, columnMetadata.Name, metadataType)
 		}
 		return value, nil
 
@@ -139,13 +146,77 @@ func ConvertValue(value any, columnMetadata ColumnMetadata) (driver.Value, error
 					return t, nil
 				}
 			}
-			return nil, fmt.Errorf("failed to parse time %q for column %q (expected type %s)", s, columnMetadata.Name, columnMetadata.Type)
+			return nil, fmt.Errorf("failed to parse time %q for column %q (expected type %s)", s, columnMetadata.Name, metadataType)
 		}
 		return value, nil
-
 	default:
+		// Handle parameterized types like DECIMAL(15,2), NUMERIC(10,0)
+		if strings.HasPrefix(metadataType, "DECIMAL") || strings.HasPrefix(metadataType, "NUMERIC") {
+			if s, ok := value.(string); ok {
+				width, scale, err := parseDecimalType(metadataType)
+				if err != nil {
+					return nil, fmt.Errorf("failed to parse decimal type %q: %w", metadataType, err)
+				}
+				unscaled, err := parseDecimalString(s, scale)
+				if err != nil {
+					return nil, fmt.Errorf("failed to parse decimal value %q for column %q: %w", s, columnMetadata.Name, err)
+				}
+				return duckdb.Decimal{Width: width, Scale: scale, Value: unscaled}, nil
+			}
+			return value, nil
+		}
 		// For all other types (BIGINT, BOOLEAN, VARCHAR, etc.), pass through as-is
 		// The driver will handle basic conversions
 		return value, nil
 	}
+}
+
+func parseDecimalType(typ string) (width uint8, scale uint8, err error) {
+	start := strings.IndexByte(typ, '(')
+	end := strings.IndexByte(typ, ')')
+	if start == -1 || end == -1 {
+		return 0, 0, fmt.Errorf("missing (width,scale) in type %q", typ)
+	}
+	parts := strings.SplitN(typ[start+1:end], ",", 2)
+	if len(parts) != 2 {
+		return 0, 0, fmt.Errorf("expected (width,scale) in type %q", typ)
+	}
+	w, err := strconv.ParseUint(strings.TrimSpace(parts[0]), 10, 8)
+	if err != nil {
+		return 0, 0, fmt.Errorf("invalid width in type %q: %w", typ, err)
+	}
+	s, err := strconv.ParseUint(strings.TrimSpace(parts[1]), 10, 8)
+	if err != nil {
+		return 0, 0, fmt.Errorf("invalid scale in type %q: %w", typ, err)
+	}
+	return uint8(w), uint8(s), nil
+}
+
+// parseDecimalString converts a decimal string like "123.45" into the unscaled
+// *big.Int representation for the given scale (e.g. scale=2 → 12345).
+func parseDecimalString(s string, scale uint8) (*big.Int, error) {
+	parts := strings.SplitN(strings.TrimSpace(s), ".", 2)
+	intPart := parts[0]
+	var fracPart string
+	if len(parts) == 2 {
+		fracPart = parts[1]
+	}
+
+	if len(fracPart) < int(scale) {
+		fracPart += strings.Repeat("0", int(scale)-len(fracPart))
+	} else if len(fracPart) > int(scale) {
+		for _, c := range fracPart[scale:] {
+			if c != '0' {
+				return nil, fmt.Errorf("value %q has %d fractional digits, exceeding scale %d", s, len(fracPart), scale)
+			}
+		}
+		fracPart = fracPart[:scale]
+	}
+
+	unscaled := intPart + fracPart
+	result, ok := new(big.Int).SetString(unscaled, 10)
+	if !ok {
+		return nil, fmt.Errorf("failed to parse %q as integer", unscaled)
+	}
+	return result, nil
 }
