@@ -66,7 +66,7 @@ func Execute(ctx context.Context, dsn string, request ducktape.ExecuteRequest) (
 		return nil, fmt.Errorf("at least one statement is required")
 	}
 
-	connector, err := utils.NewConnector(dsn)
+	connector, err := utils.NewConnector(ctx, dsn)
 	if err != nil {
 		return nil, fmt.Errorf("failed to start a SQL client for execute(%q): %w", "duckdb", err)
 	}

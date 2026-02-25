@@ -71,7 +71,7 @@ func TestEscapeSQLString(t *testing.T) {
 }
 
 func TestNewConnector_NoToken(t *testing.T) {
-	connector, err := NewConnector("")
+	connector, err := NewConnector(t.Context(), "")
 	if err != nil {
 		t.Fatalf("NewConnector(%q) returned error: %v", "", err)
 	}
@@ -83,7 +83,7 @@ func TestNewConnector_NoToken(t *testing.T) {
 }
 
 func TestNewConnector_TokenEscaping(t *testing.T) {
-	connector, err := NewConnector(":memory:?motherduck_token=abc'def")
+	connector, err := NewConnector(t.Context(), ":memory:?motherduck_token=abc'def")
 	if err != nil {
 		errMsg := err.Error()
 		if strings.Contains(errMsg, "unterminated") || strings.Contains(errMsg, "syntax error") {

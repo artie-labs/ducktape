@@ -54,7 +54,7 @@ func handleQuery(w http.ResponseWriter, r *http.Request) {
 }
 
 func Query(ctx context.Context, dsn string, request ducktape.QueryRequest) ([]map[string]any, error) {
-	connector, err := utils.NewConnector(dsn)
+	connector, err := utils.NewConnector(ctx, dsn)
 	if err != nil {
 		return nil, fmt.Errorf("failed to start a SQL client for queries(%q): %w", "duckdb", err)
 	}

@@ -83,7 +83,7 @@ func handleAppend(w http.ResponseWriter, r *http.Request) {
 }
 
 func Append(ctx context.Context, dsn string, database string, schema string, table string, input io.Reader) (rowsAppended int64, bytesRead uint64, err error) {
-	connector, err := utils.NewConnector(dsn)
+	connector, err := utils.NewConnector(ctx, dsn)
 	if err != nil {
 		return 0, 0, fmt.Errorf("failed to start a SQL client for append(%q): %w", "duckdb", err)
 	}

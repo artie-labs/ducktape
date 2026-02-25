@@ -17,7 +17,7 @@ type Connector struct {
 	db        *sql.DB
 }
 
-func NewConnector(dsn string) (*Connector, error) {
+func NewConnector(ctx context.Context, dsn string) (*Connector, error) {
 	params := parseDSN(dsn)
 	tokens, hasToken := params["motherduck_token"]
 	if !hasToken {
@@ -46,7 +46,7 @@ func NewConnector(dsn string) (*Connector, error) {
 			`ATTACH 'md:'`,
 		}
 		for _, query := range bootQueries {
-			_, err := execer.ExecContext(context.Background(), query, nil)
+			_, err := execer.ExecContext(ctx, query, nil)
 			if err != nil {
 				return err
 			}

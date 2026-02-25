@@ -23,7 +23,7 @@ func handlePing(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 
-	connector, err := utils.NewConnector(dsn)
+	connector, err := utils.NewConnector(ctx, dsn)
 	if err != nil {
 		errMsg := err.Error()
 		handleInternalServerErrorJSON(w, ducktape.QueryResponse{Error: &errMsg}, err)
