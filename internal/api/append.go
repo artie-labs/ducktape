@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"cmp"
 	"context"
-	"database/sql"
 	"database/sql/driver"
 	"fmt"
 	"io"
@@ -84,11 +83,13 @@ func handleAppend(w http.ResponseWriter, r *http.Request) {
 }
 
 func Append(ctx context.Context, dsn string, database string, schema string, table string, input io.Reader) (rowsAppended int64, bytesRead uint64, err error) {
-	db, err := sql.Open("duckdb", dsn)
+	connector, err := utils.NewConnector(ctx, dsn)
 	if err != nil {
 		return 0, 0, fmt.Errorf("failed to start a SQL client for append(%q): %w", "duckdb", err)
 	}
-	defer db.Close()
+	defer connector.Close()
+
+	db := connector.GetDB()
 
 	if err = db.Ping(); err != nil {
 		return 0, 0, fmt.Errorf("failed to validate the DB connection for append(%q): %w", "duckdb", err)

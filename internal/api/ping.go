@@ -1,13 +1,13 @@
 package api
 
 import (
-	"database/sql"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"time"
 
 	"github.com/artie-labs/ducktape/api/pkg/ducktape"
+	"github.com/artie-labs/ducktape/internal/utils"
 	_ "github.com/duckdb/duckdb-go/v2"
 )
 
@@ -23,13 +23,15 @@ func handlePing(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 
-	db, err := sql.Open("duckdb", dsn)
+	connector, err := utils.NewConnector(ctx, dsn)
 	if err != nil {
 		errMsg := err.Error()
 		handleInternalServerErrorJSON(w, ducktape.QueryResponse{Error: &errMsg}, err)
 		return
 	}
-	defer db.Close()
+	defer connector.Close()
+
+	db := connector.GetDB()
 
 	if err = db.PingContext(ctx); err != nil {
 		err := fmt.Errorf("failed to validate the DB connection for ping(%q): %w", "duckdb", err)
