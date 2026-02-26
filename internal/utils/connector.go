@@ -18,7 +18,7 @@ type Connector struct {
 }
 
 func NewConnector(ctx context.Context, dsn string) (*Connector, error) {
-	params := parseDSN(dsn)
+	target, params := parseDSN(dsn)
 	tokens, hasToken := params["motherduck_token"]
 	if !hasToken {
 		db, err := sql.Open("duckdb", dsn)
@@ -31,6 +31,8 @@ func NewConnector(ctx context.Context, dsn string) (*Connector, error) {
 	} else {
 		params.Del("motherduck_token")
 	}
+
+	targetDB := strings.TrimPrefix(target, "md:")
 
 	encodedParams := params.Encode()
 	var inMemoryDSN string
@@ -46,6 +48,9 @@ func NewConnector(ctx context.Context, dsn string) (*Connector, error) {
 			`LOAD motherduck`,
 			fmt.Sprintf("SET motherduck_token='%s'", escapeSQLString(tokens[0])),
 			`ATTACH 'md:'`,
+		}
+		if targetDB != "" {
+			bootQueries = append(bootQueries, fmt.Sprintf("USE '%s'", escapeSQLString(targetDB)))
 		}
 		for _, query := range bootQueries {
 			_, err := execer.ExecContext(ctx, query, nil)
@@ -65,18 +70,18 @@ func escapeSQLString(s string) string {
 	return strings.ReplaceAll(s, "'", "''")
 }
 
-func parseDSN(dsn string) url.Values {
+func parseDSN(dsn string) (string, url.Values) {
 	empty := url.Values{}
 	parts := strings.SplitN(dsn, "?", 2)
 	if len(parts) != 2 {
-		return empty
+		return "", empty
 	}
 
 	params, err := url.ParseQuery(parts[1])
 	if err != nil {
-		return empty
+		return "", empty
 	}
-	return params
+	return parts[0], params
 }
 
 func (c *Connector) GetDB() *sql.DB {

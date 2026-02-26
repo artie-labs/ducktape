@@ -7,21 +7,30 @@ import (
 
 func TestParseDSN(t *testing.T) {
 	t.Run("no query params", func(t *testing.T) {
-		result := parseDSN("/path/to/db")
+		target, result := parseDSN("/path/to/db")
+		if target != "" {
+			t.Errorf("target = %q, want %q", target, "")
+		}
 		if len(result) != 0 {
 			t.Errorf("expected empty, got %v", result)
 		}
 	})
 
 	t.Run("single param", func(t *testing.T) {
-		result := parseDSN("/path/to/db?motherduck_token=abc123")
+		target, result := parseDSN("/path/to/db?motherduck_token=abc123")
+		if target != "/path/to/db" {
+			t.Errorf("target = %q, want %q", target, "/path/to/db")
+		}
 		if got := result.Get("motherduck_token"); got != "abc123" {
 			t.Errorf("motherduck_token = %q, want %q", got, "abc123")
 		}
 	})
 
 	t.Run("multiple params", func(t *testing.T) {
-		result := parseDSN(":memory:?motherduck_token=abc123&threads=4")
+		target, result := parseDSN(":memory:?motherduck_token=abc123&threads=4")
+		if target != ":memory:" {
+			t.Errorf("target = %q, want %q", target, ":memory:")
+		}
 		if got := result.Get("motherduck_token"); got != "abc123" {
 			t.Errorf("motherduck_token = %q, want %q", got, "abc123")
 		}
@@ -31,7 +40,10 @@ func TestParseDSN(t *testing.T) {
 	})
 
 	t.Run("empty query string", func(t *testing.T) {
-		result := parseDSN("/path/to/db?")
+		target, result := parseDSN("/path/to/db?")
+		if target != "/path/to/db" {
+			t.Errorf("target = %q, want %q", target, "/path/to/db")
+		}
 		if len(result) != 0 {
 			t.Errorf("expected empty, got %v", result)
 		}
