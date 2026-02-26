@@ -26,6 +26,8 @@ func NewConnector(ctx context.Context, dsn string) (*Connector, error) {
 			return nil, fmt.Errorf("failed to open duckdb: %w", err)
 		}
 		return &Connector{db: db}, nil
+	} else if tokens[0] == "" {
+		return nil, fmt.Errorf("motherduck_token is empty")
 	} else {
 		params.Del("motherduck_token")
 	}
