@@ -123,6 +123,7 @@ func main() {
 				*database,
 				*schema,
 				*table,
+				true,
 				streamIterator,
 				func(r ducktape.RowMessage) ([]byte, error) {
 					bs, err := json.Marshal(r)

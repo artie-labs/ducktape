@@ -3,6 +3,7 @@ package ducktape
 import (
 	"bufio"
 	"bytes"
+	"compress/gzip"
 	"context"
 	"crypto/tls"
 	"fmt"
@@ -129,6 +130,7 @@ func (c *Client) Append(
 	database string,
 	schema string,
 	table string,
+	useGzip bool,
 	streamIterator iter.Seq[RowMessageResult],
 	marshalFunc func(r RowMessage) ([]byte, error),
 	unmarshalFunc func(r []byte) (*AppendResponse, error),
@@ -144,11 +146,21 @@ func (c *Client) Append(
 	req.Header.Set(DuckDBDatabaseHeader, database)
 	req.Header.Set(DuckDBSchemaHeader, schema)
 	req.Header.Set(DuckDBTableHeader, table)
+	if useGzip {
+		req.Header.Set("Content-Encoding", "gzip")
+	}
 
 	pr, pw := io.Pipe()
 
 	go func() {
-		bw := bufio.NewWriterSize(pw, RecommendedBufferSize)
+		var w io.Writer = pw
+		var gw *gzip.Writer
+		if useGzip {
+			gw = gzip.NewWriter(pw)
+			w = gw
+		}
+
+		bw := bufio.NewWriterSize(w, RecommendedBufferSize)
 		for rowMessageResult := range streamIterator {
 			if rowMessageResult.Error != nil {
 				pw.CloseWithError(fmt.Errorf("error in row message result: %s", *rowMessageResult.Error))
@@ -171,6 +183,13 @@ func (c *Client) Append(
 		if err := bw.Flush(); err != nil {
 			pw.CloseWithError(err)
 			return
+		}
+		// Close gzip writer before the pipe so the gzip footer is flushed.
+		if gw != nil {
+			if err := gw.Close(); err != nil {
+				pw.CloseWithError(err)
+				return
+			}
 		}
 		pw.Close()
 	}()
