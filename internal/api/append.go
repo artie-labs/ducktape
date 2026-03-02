@@ -3,6 +3,7 @@ package api
 import (
 	"bufio"
 	"cmp"
+	"compress/gzip"
 	"context"
 	"database/sql/driver"
 	"fmt"
@@ -58,7 +59,20 @@ func handleAppend(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 
-	rowsAppended, bytesRead, err := Append(ctx, dsn, database, schema, table, r.Body)
+	var body io.Reader = r.Body
+	if r.Header.Get("Content-Encoding") == "gzip" {
+		gzReader, gzErr := gzip.NewReader(r.Body)
+		if gzErr != nil {
+			err := fmt.Errorf("failed to create gzip reader: %w", gzErr)
+			errMsg := err.Error()
+			handleBadRequestJSON(w, ducktape.AppendResponse{Error: &errMsg}, err)
+			return
+		}
+		defer gzReader.Close()
+		body = gzReader
+	}
+
+	rowsAppended, bytesRead, err := Append(ctx, dsn, database, schema, table, body)
 	if err != nil {
 		errMsg := err.Error()
 		handleInternalServerErrorJSON(w, ducktape.AppendResponse{Error: &errMsg}, err)
@@ -69,7 +83,7 @@ func handleAppend(w http.ResponseWriter, r *http.Request) {
 	response := ducktape.AppendResponse{
 		RowsAppended: rowsAppended,
 	}
-	body, err := json.Marshal(response)
+	responseBytes, err := json.Marshal(response)
 	if err != nil {
 		err := fmt.Errorf("failed to marshal response: %v", err)
 		errMsg := err.Error()
@@ -78,7 +92,7 @@ func handleAppend(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	w.Write(body)
+	w.Write(responseBytes)
 	slog.Info(fmt.Sprintf("append complete for table %s.%s.%s", database, schema, table), slog.Int64("totalRowsAppended", rowsAppended), slog.Uint64("totalBytesRead", bytesRead), slog.Duration("elapsed", time.Since(start)))
 }
 

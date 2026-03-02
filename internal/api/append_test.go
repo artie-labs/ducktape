@@ -414,7 +414,7 @@ func BenchmarkAppend(b *testing.B) {
 		}
 	}
 
-	client.Append(ctx, dsn, databaseName, schemaName, tableName, streamIterator, func(r ducktape.RowMessage) ([]byte, error) {
+	client.Append(ctx, dsn, databaseName, schemaName, tableName, false, streamIterator, func(r ducktape.RowMessage) ([]byte, error) {
 		return json.Marshal(r)
 	}, func(r []byte) (*ducktape.AppendResponse, error) {
 		var resp ducktape.AppendResponse
@@ -491,7 +491,7 @@ func BenchmarkAppend_1KB_Local(b *testing.B) {
 		}
 	}
 
-	client.Append(ctx, dsn, databaseName, schemaName, tableName, streamIterator,
+	client.Append(ctx, dsn, databaseName, schemaName, tableName, false, streamIterator,
 		func(r ducktape.RowMessage) ([]byte, error) {
 			return json.Marshal(r)
 		},
@@ -566,7 +566,7 @@ func BenchmarkAppend_64KB_Local(b *testing.B) {
 		}
 	}
 
-	client.Append(ctx, dsn, databaseName, schemaName, tableName, streamIterator,
+	client.Append(ctx, dsn, databaseName, schemaName, tableName, true, streamIterator,
 		func(r ducktape.RowMessage) ([]byte, error) {
 			return json.Marshal(r)
 		},
