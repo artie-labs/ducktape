@@ -164,7 +164,7 @@ func Append(ctx context.Context, dsn string, database string, schema string, tab
 
 		// Flush if we've reached row limit OR bytes limit
 		if rowsAppended%flushInterval == 0 || bytesSinceFlush >= flushBytesLimit {
-			slog.Info("flushing appender", slog.Int64("rowsAppended", rowsAppended), slog.Uint64("bytesRead", bytesRead), slog.Uint64("bytesSinceFlush", bytesSinceFlush))
+			slog.Info(fmt.Sprintf("flushing appender for database %s, schema %s, table %s", database, schema, table), slog.Int64("rowsAppended", rowsAppended), slog.Uint64("bytesRead", bytesRead), slog.Uint64("bytesSinceFlush", bytesSinceFlush))
 			if err := appender.Flush(); err != nil {
 				return 0, 0, fmt.Errorf("failed to flush appender for database %s, schema %s, table %s: %w", database, schema, table, err)
 			}
