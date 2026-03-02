@@ -141,43 +141,43 @@ func Append(ctx context.Context, dsn string, database string, schema string, tab
 
 		var rowMsg ducktape.RowMessage
 		if err := json.Unmarshal(line, &rowMsg); err != nil {
-			return 0, 0, fmt.Errorf("failed to unmarshal row message: %w", err)
+			return 0, 0, fmt.Errorf("failed to unmarshal row message for database %s, schema %s, table %s: %w", database, schema, table, err)
 		}
 
 		values := make([]driver.Value, len(rowMsg.Values))
 		for i, v := range rowMsg.Values {
 			if i >= len(columnMetadata) {
-				return 0, 0, fmt.Errorf("value index %d exceeds number of columns %d", i, len(columnMetadata))
+				return 0, 0, fmt.Errorf("value index %d exceeds number of columns %d for database %s, schema %s, table %s", i, len(columnMetadata), database, schema, table)
 			}
 			convertedValue, err := utils.ConvertValue(v, columnMetadata[i])
 			if err != nil {
-				return 0, 0, fmt.Errorf("failed to convert value while appending: %w", err)
+				return 0, 0, fmt.Errorf("failed to convert value while appending for database %s, schema %s, table %s: %w", database, schema, table, err)
 			}
 			values[i] = convertedValue
 		}
 
 		if err := appender.AppendRow(values...); err != nil {
-			return 0, 0, fmt.Errorf("failed to append row: %w", err)
+			return 0, 0, fmt.Errorf("failed to append row for database %s, schema %s, table %s: %w", database, schema, table, err)
 		}
 
 		rowsAppended++
 
 		// Flush if we've reached row limit OR bytes limit
 		if rowsAppended%flushInterval == 0 || bytesSinceFlush >= flushBytesLimit {
-			slog.Info("flushing appender", slog.Int64("rowsAppended", rowsAppended), slog.Uint64("bytesRead", bytesRead), slog.Uint64("bytesSinceFlush", bytesSinceFlush))
+			slog.Info(fmt.Sprintf("flushing appender for database %s, schema %s, table %s", database, schema, table), slog.Int64("rowsAppended", rowsAppended), slog.Uint64("bytesRead", bytesRead), slog.Uint64("bytesSinceFlush", bytesSinceFlush))
 			if err := appender.Flush(); err != nil {
-				return 0, 0, fmt.Errorf("failed to flush appender: %w", err)
+				return 0, 0, fmt.Errorf("failed to flush appender for database %s, schema %s, table %s: %w", database, schema, table, err)
 			}
 			bytesSinceFlush = 0 // Reset counter after flush
 		}
 	}
 
 	if err := scanner.Err(); err != nil && err != io.EOF {
-		return 0, 0, fmt.Errorf("failed to read request stream: %w", err)
+		return 0, 0, fmt.Errorf("failed to read request stream for database %s, schema %s, table %s: %w", database, schema, table, err)
 	}
 
 	if err := appender.Flush(); err != nil {
-		return 0, 0, fmt.Errorf("failed to flush appender: %w", err)
+		return 0, 0, fmt.Errorf("failed to flush appender for database %s, schema %s, table %s: %w", database, schema, table, err)
 	}
 
 	return rowsAppended, bytesRead, nil
