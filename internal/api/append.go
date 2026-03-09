@@ -118,7 +118,12 @@ func Append(ctx context.Context, dsn string, database string, schema string, tab
 	if err != nil {
 		return 0, 0, fmt.Errorf("failed to create an appender(%q): %w", "duckdb", err)
 	}
-	defer appender.Close()
+	var appenderClosed bool
+	defer func() {
+		if !appenderClosed {
+			appender.Close()
+		}
+	}()
 
 	// Stream NDJSON from request body
 	scanner := bufio.NewScanner(input)
@@ -176,8 +181,9 @@ func Append(ctx context.Context, dsn string, database string, schema string, tab
 		return 0, 0, fmt.Errorf("failed to read request stream for database %s, schema %s, table %s: %w", database, schema, table, err)
 	}
 
-	if err := appender.Flush(); err != nil {
-		return 0, 0, fmt.Errorf("failed to flush appender for database %s, schema %s, table %s: %w", database, schema, table, err)
+	appenderClosed = true
+	if err := appender.Close(); err != nil {
+		return 0, 0, fmt.Errorf("failed to close appender for database %s, schema %s, table %s: %w", database, schema, table, err)
 	}
 
 	return rowsAppended, bytesRead, nil
