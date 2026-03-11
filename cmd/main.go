@@ -19,7 +19,10 @@ import (
 	"golang.org/x/net/http2/h2c"
 )
 
-const defaultDrainDelay = 10 * time.Second
+const (
+	defaultDrainDelay = 10 * time.Second
+	shutdownTimeout   = 5 * time.Minute
+)
 
 func main() {
 	var level slog.Level
@@ -107,11 +110,9 @@ func main() {
 		}
 	}
 
-	const shutdownTimeout = 5 * time.Minute
-
 	api.SetDraining(true)
-	log.Printf("Received shutdown signal, entering drain period for %s", drainDelay)
 	if drainDelay > 0 {
+		log.Printf("Received shutdown signal, entering drain period for %s", drainDelay)
 		time.Sleep(drainDelay)
 	}
 
