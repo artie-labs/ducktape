@@ -5,6 +5,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"sync/atomic"
 
 	jsoniter "github.com/json-iterator/go"
 
@@ -12,11 +13,26 @@ import (
 )
 
 var json = jsoniter.ConfigCompatibleWithStandardLibrary
+var draining atomic.Bool
+
+func SetDraining(v bool) {
+	draining.Store(v)
+}
 
 func RegisterHealthCheckRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("OK"))
+	})
+
+	mux.HandleFunc("GET /ready", func(w http.ResponseWriter, r *http.Request) {
+		if draining.Load() {
+			http.Error(w, "draining", http.StatusServiceUnavailable)
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("READY"))
 	})
 }
 

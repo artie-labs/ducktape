@@ -1,11 +1,16 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"log"
 	"log/slog"
 	"net/http"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
+	"time"
 
 	"github.com/artie-labs/ducktape/api/pkg/ducktape"
 	"github.com/artie-labs/ducktape/internal/api"
@@ -13,6 +18,8 @@ import (
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
 )
+
+const defaultDrainDelay = 10 * time.Second
 
 func main() {
 	var level slog.Level
@@ -63,6 +70,58 @@ func main() {
 		MaxUploadBufferPerStream:     ducktape.RecommendedBufferSize * 4,  // 4 MB per stream
 	})
 
-	log.Printf("Starting server on port %s\n", port)
-	log.Fatal(http.ListenAndServe("0.0.0.0:"+port, h2cHandler))
+	api.SetDraining(false)
+	server := &http.Server{
+		Addr:    "0.0.0.0:" + port,
+		Handler: h2cHandler,
+	}
+
+	serverErrCh := make(chan error, 1)
+	go func() {
+		log.Printf("Starting server on port %s\n", port)
+		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			serverErrCh <- err
+		}
+	}()
+
+	signalContext, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	select {
+	case err := <-serverErrCh:
+		log.Fatal(err)
+	case <-signalContext.Done():
+	}
+
+	drainDelay := 0 * time.Second
+	if drainDelayEnv := os.Getenv("DUCKTAPE_DRAIN_DELAY"); drainDelayEnv != "" {
+		parsedDrainDelay, err := time.ParseDuration(drainDelayEnv)
+		if err != nil {
+			log.Printf("Invalid DUCKTAPE_DRAIN_DELAY=%q, using %s", drainDelayEnv, defaultDrainDelay)
+			drainDelay = defaultDrainDelay
+		} else if parsedDrainDelay < 0 {
+			log.Printf("Ignoring negative DUCKTAPE_DRAIN_DELAY=%q, using %s", drainDelayEnv, defaultDrainDelay)
+			drainDelay = defaultDrainDelay
+		} else {
+			drainDelay = parsedDrainDelay
+		}
+	}
+
+	const shutdownTimeout = 5 * time.Minute
+
+	api.SetDraining(true)
+	log.Printf("Received shutdown signal, entering drain period for %s", drainDelay)
+	if drainDelay > 0 {
+		time.Sleep(drainDelay)
+	}
+
+	shutdownContext, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+	defer cancel()
+
+	if err := server.Shutdown(shutdownContext); err != nil {
+		log.Printf("Graceful shutdown failed: %v", err)
+		if closeErr := server.Close(); closeErr != nil {
+			log.Printf("Forced close failed: %v", closeErr)
+		}
+	}
 }

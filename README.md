@@ -83,6 +83,9 @@ PORT=8080 DUCKTAPE_LOG=debug go run cmd/main.go
 
 # Health check
 curl http://localhost:8080/health
+
+# Readiness check
+curl http://localhost:8080/ready
 ```
 
 Server runs on port 8080 by default.
