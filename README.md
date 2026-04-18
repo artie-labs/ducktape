@@ -116,6 +116,21 @@ curl -X POST http://localhost:8080/api/query \
   -d '{"query": "SELECT * FROM users WHERE name = ?", "args": ["Alice"]}'
 ```
 
+#### Query after running an init script
+
+* This example uses an init script to set up a connection to a self-hosted ducklake and then query it
+
+```bash
+# this will run the given file to set up the ducklake connection prior to running 'show schemas;'
+curl -sS -X POST 'http://localhost:8080/api/query' \
+--header 'X-DuckDB-Connection-String: rcfile:/sensitive/.duckdbrc' \
+--header 'Content-Type: application/json' \
+--data '{
+    "Query": "show schemas;"
+}'
+```
+
+
 ### Append
 
 Streams NDJSON data over HTTP/2. Each line is a `RowMessage` with a `rv` (row values) array. Use the Go client for streaming large datasets.

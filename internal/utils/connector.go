@@ -29,9 +29,8 @@ func NewConnector(ctx context.Context, dsn string) (*Connector, error) {
 			return nil, fmt.Errorf("failed to read DUCKDBRC file %q: %w", rcFilePath, err)
 		}
 		rcFileData := string(data)
-		slog.Debug("DUCKDBRC file contents", "contents", rcFileData)
 
-		c, err := duckdb.NewConnector("memory", func(execer driver.ExecerContext) error {
+		c, err := duckdb.NewConnector(":memory:", func(execer driver.ExecerContext) error {
 			_, err :=execer.ExecContext(ctx, rcFileData, nil)
 			if err != nil {
 				return err
