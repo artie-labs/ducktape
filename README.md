@@ -118,7 +118,38 @@ curl -X POST http://localhost:8080/api/query \
 
 #### Query after running an init script
 
-* This example uses an init script to set up a connection to a self-hosted ducklake and then query it
+* This example uses an init script stored in the container to set up a connection to a self-hosted ducklake and then query it.
+
+`/sensitive/.duckdbrc`
+```sql
+--put your own info in where there are <>
+
+INSTALL httpfs;
+LOAD httpfs;   
+
+CREATE OR REPLACE SECRET ducklake_storage (
+    TYPE s3,
+    PROVIDER config,
+    KEY_ID '<KEY_ID>,
+    SECRET '<KEY_SECRET>',
+    REGION 'us-east-1',
+    ENDPOINT '<ENDPOINT>',
+    URL_STYLE 'path',
+    USE_SSL 'true'
+);
+
+INSTALL ducklake;
+INSTALL postgres;
+
+ATTACH 'ducklake:postgres:dbname=reporting_ducklake host=<HOST> port=<PORT> user=reporting_ducklake password=<PW>' 
+AS reporting__prod
+( DATA_PATH 's3://revo-reporting/ducklake/reporting/prod', METADATA_SCHEMA 'reporting__prod', OVERRIDE_DATA_PATH true ) 
+;
+
+USE reporting__prod;
+
+```
+* Call with connection string set as `rcfile:<PATH TO FILE>`
 
 ```bash
 # this will run the given file to set up the ducklake connection prior to running 'show schemas;'
@@ -129,7 +160,6 @@ curl -sS -X POST 'http://localhost:8080/api/query' \
     "Query": "show schemas;"
 }'
 ```
-
 
 ### Append
 
