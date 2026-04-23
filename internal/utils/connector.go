@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+	"os"
+	"log/slog"
 
 	"github.com/duckdb/duckdb-go/v2"
 )
@@ -18,6 +20,30 @@ type Connector struct {
 }
 
 func NewConnector(ctx context.Context, dsn string) (*Connector, error) {
+	if strings.HasPrefix(dsn, "rcfile:") {
+		rcFilePath := strings.TrimPrefix(dsn, "rcfile:")
+		slog.Debug("using DUCKDBRC file", "path", rcFilePath)
+		
+		data, err := os.ReadFile(rcFilePath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read DUCKDBRC file %q: %w", rcFilePath, err)
+		}
+		rcFileData := string(data)
+
+		c, err := duckdb.NewConnector(":memory:", func(execer driver.ExecerContext) error {
+			_, err :=execer.ExecContext(ctx, rcFileData, nil)
+			if err != nil {
+				return err
+			}
+			return nil
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to create connector: %w", err)
+		}
+		return &Connector{connector: c, db: sql.OpenDB(c)}, nil
+		
+	}
+	
 	target, params := parseDSN(dsn)
 	tokens, hasToken := params["motherduck_token"]
 	if !hasToken {
