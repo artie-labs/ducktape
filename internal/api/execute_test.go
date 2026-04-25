@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/artie-labs/ducktape/api/pkg/ducktape"
+	"github.com/artie-labs/ducktape/internal/utils"
 	_ "github.com/duckdb/duckdb-go/v2"
 )
 
@@ -288,12 +289,16 @@ func TestExecute(t *testing.T) {
 			t.Errorf("expected 2 rows remaining, got %d", len(rows))
 		}
 
-		if rows[0]["status"] != "completed" {
-			t.Errorf("expected first row status='completed', got %v", rows[0]["status"])
+		obj0 := rows[0].(*utils.OrderedMap)
+		status0, _ := obj0.Get("status")
+		if status0 != "completed" {
+			t.Errorf("expected first row status='completed', got %v", status0)
 		}
 
-		if rows[1]["status"] != "completed" {
-			t.Errorf("expected second row status='completed', got %v", rows[1]["status"])
+		obj1 := rows[1].(*utils.OrderedMap)
+		status1, _ := obj1.Get("status")
+		if status1 != "completed" {
+			t.Errorf("expected second row status='completed', got %v", status1)
 		}
 	})
 
