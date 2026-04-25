@@ -53,7 +53,7 @@ func handleQuery(w http.ResponseWriter, r *http.Request) {
 	slog.Debug("query results", slog.Any("rows", objects), slog.Duration("elapsed", time.Since(start)))
 }
 
-func Query(ctx context.Context, dsn string, request ducktape.QueryRequest) ([]map[string]any, error) {
+func Query(ctx context.Context, dsn string, request ducktape.QueryRequest) ([]any, error) {
 	connector, err := utils.NewConnector(ctx, dsn)
 	if err != nil {
 		return nil, fmt.Errorf("failed to start a SQL client for queries(%q): %w", "duckdb", err)
