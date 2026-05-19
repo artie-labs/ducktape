@@ -15,6 +15,39 @@ import (
 	"golang.org/x/net/http2/h2c"
 )
 
+func TestEnvIntDefault(t *testing.T) {
+	const key = "DUCKTAPE_TEST_ENV_INT"
+
+	tests := []struct {
+		name     string
+		value    string
+		unset    bool
+		fallback int
+		want     int
+	}{
+		{name: "unset returns fallback", unset: true, fallback: 100, want: 100},
+		{name: "empty returns fallback", value: "", fallback: 100, want: 100},
+		{name: "valid positive int", value: "32", fallback: 100, want: 32},
+		{name: "non-numeric returns fallback", value: "garbage", fallback: 100, want: 100},
+		{name: "zero returns fallback", value: "0", fallback: 100, want: 100},
+		{name: "negative returns fallback", value: "-5", fallback: 100, want: 100},
+		{name: "large value accepted", value: "67108864", fallback: 100, want: 67108864},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.unset {
+				os.Unsetenv(key)
+			} else {
+				t.Setenv(key, tc.value)
+			}
+			if got := envIntDefault(key, tc.fallback); got != tc.want {
+				t.Errorf("envIntDefault(%q, %d) with value=%q = %d, want %d", key, tc.fallback, tc.value, got, tc.want)
+			}
+		})
+	}
+}
+
 func TestAppend(t *testing.T) {
 	ctx := context.Background()
 
