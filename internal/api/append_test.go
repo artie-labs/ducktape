@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"strings"
@@ -19,18 +20,19 @@ func TestEnvIntDefault(t *testing.T) {
 	const key = "DUCKTAPE_TEST_ENV_INT"
 
 	tests := []struct {
-		name     string
-		value    string
-		unset    bool
-		fallback int
-		want     int
+		name        string
+		value       string
+		unset       bool
+		fallback    int
+		want        int
+		wantWarnSub string // substring expected in slog warn output; empty means no warning expected
 	}{
 		{name: "unset returns fallback", unset: true, fallback: 100, want: 100},
 		{name: "empty returns fallback", value: "", fallback: 100, want: 100},
 		{name: "valid positive int", value: "32", fallback: 100, want: 32},
-		{name: "non-numeric returns fallback", value: "garbage", fallback: 100, want: 100},
-		{name: "zero returns fallback", value: "0", fallback: 100, want: 100},
-		{name: "negative returns fallback", value: "-5", fallback: 100, want: 100},
+		{name: "non-numeric returns fallback and warns", value: "garbage", fallback: 100, want: 100, wantWarnSub: "Invalid value"},
+		{name: "zero returns fallback and warns", value: "0", fallback: 100, want: 100, wantWarnSub: "Non-positive value"},
+		{name: "negative returns fallback and warns", value: "-5", fallback: 100, want: 100, wantWarnSub: "Non-positive value"},
 		{name: "large value accepted", value: "67108864", fallback: 100, want: 67108864},
 	}
 
@@ -41,8 +43,29 @@ func TestEnvIntDefault(t *testing.T) {
 			} else {
 				t.Setenv(key, tc.value)
 			}
+
+			// Capture slog output to assert warning behaviour.
+			var buf bytes.Buffer
+			prevDefault := slog.Default()
+			slog.SetDefault(slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelWarn})))
+			t.Cleanup(func() { slog.SetDefault(prevDefault) })
+
 			if got := envIntDefault(key, tc.fallback); got != tc.want {
 				t.Errorf("envIntDefault(%q, %d) with value=%q = %d, want %d", key, tc.fallback, tc.value, got, tc.want)
+			}
+
+			logged := buf.String()
+			if tc.wantWarnSub == "" {
+				if strings.Contains(logged, "level=WARN") {
+					t.Errorf("expected no warning, got log: %q", logged)
+				}
+			} else {
+				if !strings.Contains(logged, "level=WARN") {
+					t.Errorf("expected a WARN log containing %q, got: %q", tc.wantWarnSub, logged)
+				}
+				if !strings.Contains(logged, tc.wantWarnSub) {
+					t.Errorf("expected log to contain %q, got: %q", tc.wantWarnSub, logged)
+				}
 			}
 		})
 	}

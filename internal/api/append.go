@@ -34,12 +34,20 @@ var (
 )
 
 func envIntDefault(key string, fallback int) int {
-	if v := os.Getenv(key); v != "" {
-		if n, err := strconv.Atoi(v); err == nil && n > 0 {
-			return n
-		}
+	v := os.Getenv(key)
+	if v == "" {
+		return fallback
 	}
-	return fallback
+	n, err := strconv.Atoi(v)
+	if err != nil {
+		slog.Warn(fmt.Sprintf("Invalid value for environment variable %q: %q, using fallback %d", key, v, fallback))
+		return fallback
+	}
+	if n <= 0 {
+		slog.Warn(fmt.Sprintf("Non-positive value for environment variable %q: %q, using fallback %d", key, v, fallback))
+		return fallback
+	}
+	return n
 }
 
 func handleAppend(w http.ResponseWriter, r *http.Request) {
