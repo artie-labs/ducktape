@@ -9,6 +9,8 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"os"
+	"strconv"
 	"time"
 
 	"github.com/artie-labs/ducktape/api/pkg/ducktape"
@@ -16,10 +18,37 @@ import (
 	"github.com/duckdb/duckdb-go/v2"
 )
 
-const (
-	flushInterval   = 100_000
-	flushBytesLimit = 3 * 1024 * 1024 // 3MB - flush before reaching DuckDB's 4MB limit
+var (
+	// flushInterval is the maximum number of rows the Appender buffers before flushing.
+	// Tunable via DUCKTAPE_FLUSH_ROWS.
+	flushInterval = envIntDefault("DUCKTAPE_FLUSH_ROWS", 100_000)
+
+	// flushBytesLimit is the maximum payload size the Appender buffers before flushing.
+	// Tunable via DUCKTAPE_FLUSH_BYTES. Larger values amortise round-trip cost to remote
+	// destinations (e.g. MotherDuck) at the price of more in-process memory per stream.
+	flushBytesLimit = envIntDefault("DUCKTAPE_FLUSH_BYTES", 32*1024*1024)
+
+	// maxScannerBuffer caps the size of a single NDJSON line read by the bufio.Scanner.
+	// Tunable via DUCKTAPE_SCANNER_BUFFER.
+	maxScannerBuffer = envIntDefault("DUCKTAPE_SCANNER_BUFFER", 4*1024*1024)
 )
+
+func envIntDefault(key string, fallback int) int {
+	v := os.Getenv(key)
+	if v == "" {
+		return fallback
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil {
+		slog.Warn(fmt.Sprintf("Invalid value for environment variable %q: %q, using fallback %d", key, v, fallback))
+		return fallback
+	}
+	if n <= 0 {
+		slog.Warn(fmt.Sprintf("Non-positive value for environment variable %q: %q, using fallback %d", key, v, fallback))
+		return fallback
+	}
+	return n
+}
 
 func handleAppend(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
@@ -127,11 +156,9 @@ func Append(ctx context.Context, dsn string, database string, schema string, tab
 
 	// Stream NDJSON from request body
 	scanner := bufio.NewScanner(input)
-	// Increase buffer size to handle large rows (default is 64KB)
-	// Set to 4MB to accommodate very large JSON lines
-	maxBufferSize := 4 * 1024 * 1024 // 4MB
-	buf := make([]byte, 0, 64*1024)  // Initial buffer size
-	scanner.Buffer(buf, maxBufferSize)
+	// Per-line scanner buffer; tunable via DUCKTAPE_SCANNER_BUFFER for unusually wide rows.
+	buf := make([]byte, 0, 64*1024) // Initial buffer size
+	scanner.Buffer(buf, maxScannerBuffer)
 	var bytesSinceFlush uint64
 
 	for scanner.Scan() {
@@ -168,7 +195,7 @@ func Append(ctx context.Context, dsn string, database string, schema string, tab
 		rowsAppended++
 
 		// Flush if we've reached row limit OR bytes limit
-		if rowsAppended%flushInterval == 0 || bytesSinceFlush >= flushBytesLimit {
+		if rowsAppended%int64(flushInterval) == 0 || bytesSinceFlush >= uint64(flushBytesLimit) {
 			slog.Info(fmt.Sprintf("flushing appender for database %s, schema %s, table %s", database, schema, table), slog.Int64("rowsAppended", rowsAppended), slog.Uint64("bytesRead", bytesRead), slog.Uint64("bytesSinceFlush", bytesSinceFlush))
 			if err := appender.Flush(); err != nil {
 				return 0, 0, fmt.Errorf("failed to flush appender for database %s, schema %s, table %s: %w", database, schema, table, err)

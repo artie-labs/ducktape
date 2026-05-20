@@ -169,6 +169,9 @@ Streams NDJSON data over HTTP/2. Each line is a `RowMessage` with a `rv` (row va
 
 - `PORT`: Server port (default: `8080`)
 - `DUCKTAPE_LOG`: Log level (`debug`, `info`, `warn`, `error`)
+- `DUCKTAPE_FLUSH_BYTES`: Max payload size the Appender buffers before flushing, in bytes (default: `33554432`, i.e. 32 MiB). Larger values amortise round-trip cost to remote destinations (e.g. MotherDuck) at the price of more in-process memory per stream.
+- `DUCKTAPE_FLUSH_ROWS`: Max rows the Appender buffers before flushing (default: `100000`).
+- `DUCKTAPE_SCANNER_BUFFER`: Max size of a single NDJSON line read by `bufio.Scanner`, in bytes (default: `4194304`, i.e. 4 MiB).
 
 ## Go client
 
