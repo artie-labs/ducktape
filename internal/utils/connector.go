@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"sort"
 	"strings"
 	"os"
 	"log/slog"
@@ -60,6 +61,17 @@ func NewConnector(ctx context.Context, dsn string) (*Connector, error) {
 
 	targetDB := strings.TrimPrefix(target, "md:")
 
+	var mdSettings []string
+	for key := range params {
+		if !strings.HasPrefix(key, "motherduck_") {
+			continue
+		}
+		value := params.Get(key)
+		params.Del(key)
+		mdSettings = append(mdSettings, fmt.Sprintf("SET %s='%s'", key, escapeSQLString(value)))
+	}
+	sort.Strings(mdSettings)
+
 	encodedParams := params.Encode()
 	var inMemoryDSN string
 	if encodedParams != "" {
@@ -73,8 +85,9 @@ func NewConnector(ctx context.Context, dsn string) (*Connector, error) {
 			`INSTALL motherduck`,
 			`LOAD motherduck`,
 			fmt.Sprintf("SET motherduck_token='%s'", escapeSQLString(tokens[0])),
-			`ATTACH 'md:'`,
 		}
+		bootQueries = append(bootQueries, mdSettings...)
+		bootQueries = append(bootQueries, `ATTACH 'md:'`)
 		if targetDB != "" {
 			bootQueries = append(bootQueries, fmt.Sprintf("USE '%s'", escapeSQLString(targetDB)))
 		}
