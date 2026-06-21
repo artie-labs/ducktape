@@ -5,6 +5,7 @@ import (
 	"cmp"
 	"context"
 	"database/sql/driver"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -29,8 +30,9 @@ var (
 	flushBytesLimit = envIntDefault("DUCKTAPE_FLUSH_BYTES", 32*1024*1024)
 
 	// maxScannerBuffer caps the size of a single NDJSON line read by the bufio.Scanner.
-	// Tunable via DUCKTAPE_SCANNER_BUFFER.
-	maxScannerBuffer = envIntDefault("DUCKTAPE_SCANNER_BUFFER", 4*1024*1024)
+	// Tunable via DUCKTAPE_SCANNER_BUFFER. Defaults to 32 MB to match flushBytesLimit
+	// and accommodate tables with large text/blob columns.
+	maxScannerBuffer = envIntDefault("DUCKTAPE_SCANNER_BUFFER", 32*1024*1024)
 )
 
 func envIntDefault(key string, fallback int) int {
@@ -157,7 +159,8 @@ func Append(ctx context.Context, dsn string, database string, schema string, tab
 	// Stream NDJSON from request body
 	scanner := bufio.NewScanner(input)
 	// Per-line scanner buffer; tunable via DUCKTAPE_SCANNER_BUFFER for unusually wide rows.
-	buf := make([]byte, 0, 64*1024) // Initial buffer size
+	// Initial capacity is capped at maxScannerBuffer so the two values stay consistent.
+	buf := make([]byte, 0, min(64*1024, maxScannerBuffer))
 	scanner.Buffer(buf, maxScannerBuffer)
 	var bytesSinceFlush uint64
 
@@ -205,6 +208,12 @@ func Append(ctx context.Context, dsn string, database string, schema string, tab
 	}
 
 	if err := scanner.Err(); err != nil && err != io.EOF {
+		if errors.Is(err, bufio.ErrTooLong) {
+			return 0, 0, fmt.Errorf(
+				"failed to read request stream for database %s, schema %s, table %s: row %d exceeded the scanner buffer limit of %d bytes; set DUCKTAPE_SCANNER_BUFFER env var to a larger value",
+				database, schema, table, rowsAppended+1, maxScannerBuffer,
+			)
+		}
 		return 0, 0, fmt.Errorf("failed to read request stream for database %s, schema %s, table %s: %w", database, schema, table, err)
 	}
 
