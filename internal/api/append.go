@@ -30,9 +30,8 @@ var (
 	flushBytesLimit = envIntDefault("DUCKTAPE_FLUSH_BYTES", 32*1024*1024)
 
 	// maxScannerBuffer caps the size of a single NDJSON line read by the bufio.Scanner.
-	// Tunable via DUCKTAPE_SCANNER_BUFFER. Defaults to 32 MB to match flushBytesLimit
-	// and accommodate tables with large text/blob columns.
-	maxScannerBuffer = envIntDefault("DUCKTAPE_SCANNER_BUFFER", 32*1024*1024)
+	// Tunable via DUCKTAPE_SCANNER_BUFFER for tables with large text/blob columns.
+	maxScannerBuffer = envIntDefault("DUCKTAPE_SCANNER_BUFFER", 4*1024*1024)
 )
 
 func envIntDefault(key string, fallback int) int {
