@@ -286,6 +286,40 @@ func TestAppend(t *testing.T) {
 		}
 	})
 
+	t.Run("row exceeds scanner buffer", func(t *testing.T) {
+		dsn := "test_append_scanner_overflow.db"
+		t.Cleanup(func() { os.Remove(dsn) })
+
+		_, err := Execute(ctx, dsn, ducktape.ExecuteRequest{
+			Statements: []ducktape.ExecuteStatement{
+				{Query: `CREATE TABLE test_append_scanner_overflow (id INTEGER, payload VARCHAR)`},
+			},
+		})
+		if err != nil {
+			t.Fatalf("failed to create table: %v", err)
+		}
+
+		// Temporarily shrink the scanner buffer so a short line exceeds it.
+		orig := maxScannerBuffer
+		maxScannerBuffer = 10
+		t.Cleanup(func() { maxScannerBuffer = orig })
+
+		// Row whose JSON line is longer than the 10-byte limit above.
+		ndjson := `{"rv":[1,"this value is definitely longer than ten bytes"]}` + "\n"
+
+		reader := strings.NewReader(ndjson)
+		_, _, err = Append(ctx, dsn, "test_append_scanner_overflow", "main", "test_append_scanner_overflow", reader)
+		if err == nil {
+			t.Fatal("expected error for oversized row, got none")
+		}
+		if !strings.Contains(err.Error(), "exceeded the scanner buffer limit") {
+			t.Errorf("expected sized error message, got: %v", err)
+		}
+		if !strings.Contains(err.Error(), "DUCKTAPE_SCANNER_BUFFER") {
+			t.Errorf("expected DUCKTAPE_SCANNER_BUFFER hint in error, got: %v", err)
+		}
+	})
+
 	t.Run("invalid JSON", func(t *testing.T) {
 		dsn := "test_append_invalid.db"
 		t.Cleanup(func() { os.Remove(dsn) })
