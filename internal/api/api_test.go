@@ -117,7 +117,7 @@ func TestBasicAuth(t *testing.T) {
 
 	// 1. Request without Basic Auth should fail
 	ctx := context.Background()
-	err := client.Ping(ctx, "test_auth.db")
+	err := client.Ping(ctx, ":memory:")
 	if err == nil {
 		t.Fatal("expected unauthorized error, got nil")
 	}
@@ -127,7 +127,7 @@ func TestBasicAuth(t *testing.T) {
 
 	// 2. Request with incorrect Basic Auth should fail
 	client.SetBasicAuth("admin", "wrong_password")
-	err = client.Ping(ctx, "test_auth.db")
+	err = client.Ping(ctx, ":memory:")
 	if err == nil {
 		t.Fatal("expected unauthorized error with wrong password, got nil")
 	}
@@ -135,12 +135,10 @@ func TestBasicAuth(t *testing.T) {
 		t.Fatalf("expected 401 error with wrong password, got: %v", err)
 	}
 
-	// 3. Request with correct Basic Auth should succeed (or return standard response)
+	// 3. Request with correct Basic Auth should succeed
 	client.SetBasicAuth("admin", "secret")
-	err = client.Ping(ctx, "test_auth.db")
-	// Since test_auth.db might not exist or ping might fail due to other reasons,
-	// let's check that we don't get a 401 Unauthorized.
-	if err != nil && strings.Contains(err.Error(), "401") {
-		t.Fatalf("expected authorized, but got: %v", err)
+	err = client.Ping(ctx, ":memory:")
+	if err != nil {
+		t.Fatalf("expected success, got error: %v", err)
 	}
 }
