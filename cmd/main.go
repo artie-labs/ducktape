@@ -125,4 +125,9 @@ func main() {
 			log.Printf("Forced close failed: %v", closeErr)
 		}
 	}
+
+	log.Printf("Cleaning up connection cache...")
+	if err := api.Cleanup(); err != nil {
+		log.Printf("Failed to clear connection cache: %v", err)
+	}
 }

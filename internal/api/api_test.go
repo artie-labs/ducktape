@@ -6,8 +6,15 @@ import (
 	"testing"
 
 	"github.com/artie-labs/ducktape/api/pkg/ducktape"
+	"github.com/artie-labs/ducktape/internal/utils"
 	_ "github.com/duckdb/duckdb-go/v2"
 )
+
+func TestMain(m *testing.M) {
+	// Disable caching by default for tests to maintain isolation
+	utils.SetCacheEnabled(false)
+	os.Exit(m.Run())
+}
 
 func TestQueryExecuteIntegration(t *testing.T) {
 	ctx := context.Background()
