@@ -2,11 +2,16 @@ package api
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/artie-labs/ducktape/api/pkg/ducktape"
 	_ "github.com/duckdb/duckdb-go/v2"
+	"golang.org/x/net/http2"
+	"golang.org/x/net/http2/h2c"
 )
 
 func TestQueryExecuteIntegration(t *testing.T) {
@@ -93,4 +98,49 @@ func TestContextCancellation(t *testing.T) {
 			Query: "SELECT 1",
 		})
 	})
+}
+
+func TestBasicAuth(t *testing.T) {
+	// Set environment variables for Basic Auth
+	t.Setenv("DUCKTAPE_USERNAME", "admin")
+	t.Setenv("DUCKTAPE_PASSWORD", "secret")
+
+	mux := http.NewServeMux()
+	RegisterApiRoutes(mux)
+
+	// Create a test server with h2c support
+	h2cHandler := h2c.NewHandler(mux, &http2.Server{})
+	server := httptest.NewServer(h2cHandler)
+	defer server.Close()
+
+	client := ducktape.NewClient(server.URL)
+
+	// 1. Request without Basic Auth should fail
+	ctx := context.Background()
+	err := client.Ping(ctx, "test_auth.db")
+	if err == nil {
+		t.Fatal("expected unauthorized error, got nil")
+	}
+	if !strings.Contains(err.Error(), "401") {
+		t.Fatalf("expected 401 error, got: %v", err)
+	}
+
+	// 2. Request with incorrect Basic Auth should fail
+	client.SetBasicAuth("admin", "wrong_password")
+	err = client.Ping(ctx, "test_auth.db")
+	if err == nil {
+		t.Fatal("expected unauthorized error with wrong password, got nil")
+	}
+	if !strings.Contains(err.Error(), "401") {
+		t.Fatalf("expected 401 error with wrong password, got: %v", err)
+	}
+
+	// 3. Request with correct Basic Auth should succeed (or return standard response)
+	client.SetBasicAuth("admin", "secret")
+	err = client.Ping(ctx, "test_auth.db")
+	// Since test_auth.db might not exist or ping might fail due to other reasons,
+	// let's check that we don't get a 401 Unauthorized.
+	if err != nil && strings.Contains(err.Error(), "401") {
+		t.Fatalf("expected authorized, but got: %v", err)
+	}
 }
