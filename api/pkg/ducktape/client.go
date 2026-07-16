@@ -98,6 +98,10 @@ func (c *Client) Execute(
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to execute: %s", resp.Status)
+	}
+
 	responseBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
@@ -135,6 +139,10 @@ func (c *Client) Query(
 		return nil, err
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to query: %s", resp.Status)
+	}
 
 	responseBody, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -206,6 +214,10 @@ func (c *Client) Append(
 		return nil, err
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to append: %s", resp.Status)
+	}
 
 	responseBody, err := io.ReadAll(resp.Body)
 	if err != nil {
