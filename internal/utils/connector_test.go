@@ -250,3 +250,27 @@ func BenchmarkConnectorWithAndWithoutCache(b *testing.B) {
 		}
 	})
 }
+
+func TestConnectorMaxOpenConns(t *testing.T) {
+	ctx := t.Context()
+	dsn := "test_max_open_conns.db"
+	t.Cleanup(func() {
+		SetCacheEnabled(false)
+		ClearCache()
+		os.Remove(dsn)
+	})
+
+	SetCacheEnabled(true)
+	ClearCache()
+
+	conn, err := NewConnector(ctx, dsn)
+	if err != nil {
+		t.Fatalf("failed to create connector: %v", err)
+	}
+	defer conn.Close()
+
+	stats := conn.GetDB().Stats()
+	if stats.MaxOpenConnections != 1 {
+		t.Errorf("expected MaxOpenConnections to be 1, got %d", stats.MaxOpenConnections)
+	}
+}

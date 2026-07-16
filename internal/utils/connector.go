@@ -96,6 +96,7 @@ func NewConnector(ctx context.Context, dsn string) (*Connector, error) {
 	if cacheEnabled {
 		// Set sensible connection pool defaults on the cached DB
 		conn.db.SetMaxIdleConns(10)
+		conn.db.SetMaxOpenConns(1)
 		conn.db.SetConnMaxIdleTime(10 * time.Minute)
 
 		connCache[dsn] = &cachedConn{connector: conn.connector, db: conn.db}
