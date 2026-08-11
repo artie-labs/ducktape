@@ -92,6 +92,12 @@ func ConvertValue(value any, columnMetadata ColumnMetadata) (driver.Value, error
 	metadataType := strings.ToUpper(strings.TrimSpace(columnMetadata.Type))
 
 	switch metadataType {
+	case "UUID":
+		var uuid duckdb.UUID
+		if err := uuid.Scan(value); err != nil {
+			return nil, fmt.Errorf("failed to parse UUID %q for column %q: %w", value, columnMetadata.Name, err)
+		}
+		return uuid, nil
 	case "DATE":
 		// Handle date strings (may include timestamp portion)
 		if s, ok := value.(string); ok {

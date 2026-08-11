@@ -155,6 +155,36 @@ func TestAppend(t *testing.T) {
 		}
 	})
 
+	t.Run("append UUID", func(t *testing.T) {
+		dsn := "test_append_uuid.db"
+		t.Cleanup(func() { os.Remove(dsn) })
+
+		_, err := Execute(ctx, dsn, ducktape.ExecuteRequest{
+			Statements: []ducktape.ExecuteStatement{
+				{Query: `CREATE TABLE test_append_uuid (id UUID)`},
+			},
+		})
+		if err != nil {
+			t.Fatalf("failed to create table: %v", err)
+		}
+
+		rowsAppended, _, err := Append(ctx, dsn, "test_append_uuid", "main", "test_append_uuid", strings.NewReader(`{"rv":["e7082e96-7190-4cc3-8ab4-bd27f1269f08"]}`))
+		if err != nil {
+			t.Fatalf("failed to append UUID: %v", err)
+		}
+		if rowsAppended != 1 {
+			t.Fatalf("expected one appended row, got %d", rowsAppended)
+		}
+
+		result, err := Query(ctx, dsn, ducktape.QueryRequest{Query: "SELECT typeof(id) AS type, id::VARCHAR AS id FROM test_append_uuid"})
+		if err != nil {
+			t.Fatalf("failed to query UUID: %v", err)
+		}
+		if len(result) != 1 || result[0]["type"] != "UUID" || result[0]["id"] != "e7082e96-7190-4cc3-8ab4-bd27f1269f08" {
+			t.Fatalf("unexpected UUID rows: %#v", result)
+		}
+	})
+
 	t.Run("append with temporal types", func(t *testing.T) {
 		dsn := "test_append_temporal.db"
 		t.Cleanup(func() { os.Remove(dsn) })
