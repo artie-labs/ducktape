@@ -92,6 +92,12 @@ func ConvertValue(value any, columnMetadata ColumnMetadata) (driver.Value, error
 	metadataType := strings.ToUpper(strings.TrimSpace(columnMetadata.Type))
 
 	switch metadataType {
+	case "UUID":
+		var uuid duckdb.UUID
+		if err := uuid.Scan(value); err != nil {
+			return nil, fmt.Errorf("failed to parse UUID %q for column %q: %w", value, columnMetadata.Name, err)
+		}
+		return uuid, nil
 	case "DATE":
 		// Handle date strings (may include timestamp portion)
 		if s, ok := value.(string); ok {
@@ -149,6 +155,17 @@ func ConvertValue(value any, columnMetadata ColumnMetadata) (driver.Value, error
 			return nil, fmt.Errorf("failed to parse time %q for column %q (expected type %s)", s, columnMetadata.Name, metadataType)
 		}
 		return value, nil
+	case "DOUBLE":
+		switch castedValue := value.(type) {
+		case float64:
+			return castedValue, nil
+		case int64:
+			return float64(castedValue), nil
+		case string:
+			return strconv.ParseFloat(castedValue, 64)
+		default:
+			return nil, fmt.Errorf("failed to convert value %v to float64 for column %q (expected type %s, got %T)", value, columnMetadata.Name, columnMetadata.Type, value)
+		}
 	default:
 		// Handle parameterized types like DECIMAL(15,2), NUMERIC(10,0)
 		if strings.HasPrefix(metadataType, "DECIMAL") || strings.HasPrefix(metadataType, "NUMERIC") {
