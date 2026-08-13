@@ -98,6 +98,26 @@ func ConvertValue(value any, columnMetadata ColumnMetadata) (driver.Value, error
 			return nil, fmt.Errorf("failed to parse UUID %q for column %q: %w", value, columnMetadata.Name, err)
 		}
 		return uuid, nil
+	case "UUID[]":
+		values, ok := value.([]any)
+		if !ok {
+			return nil, fmt.Errorf("expected UUID array for column %q, got %T", columnMetadata.Name, value)
+		}
+
+		convertedValues := make([]any, len(values))
+		for i, value := range values {
+			if value == nil {
+				continue
+			}
+
+			var uuid duckdb.UUID
+			if err := uuid.Scan(value); err != nil {
+				return nil, fmt.Errorf("failed to parse UUID at index %d for column %q: %w", i, columnMetadata.Name, err)
+			}
+			convertedValues[i] = uuid
+		}
+
+		return convertedValues, nil
 	case "DATE":
 		// Handle date strings (may include timestamp portion)
 		if s, ok := value.(string); ok {
