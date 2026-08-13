@@ -82,6 +82,14 @@ func GetColumnMetadata(ctx context.Context, conn *sql.Conn, database, schema, ta
 	return columns, nil
 }
 
+func convertUUID(value any) (duckdb.UUID, error) {
+	var uuid duckdb.UUID
+	if err := uuid.Scan(value); err != nil {
+		return duckdb.UUID{}, fmt.Errorf("failed to parse UUID %q: %w", value, err)
+	}
+	return uuid, nil
+}
+
 // ConvertValue converts a value from JSON (typically string or number) to the appropriate Go type
 // based on the DuckDB column type
 func ConvertValue(value any, columnMetadata ColumnMetadata) (driver.Value, error) {
@@ -92,6 +100,33 @@ func ConvertValue(value any, columnMetadata ColumnMetadata) (driver.Value, error
 	metadataType := strings.ToUpper(strings.TrimSpace(columnMetadata.Type))
 
 	switch metadataType {
+	case "UUID":
+		castedValue, err := convertUUID(value)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert UUID %q for column %q: %w", value, columnMetadata.Name, err)
+		}
+		return castedValue, nil
+	case "UUID[]":
+		values, ok := value.([]any)
+		if !ok {
+			return nil, fmt.Errorf("expected UUID array for column %q, got %T", columnMetadata.Name, value)
+		}
+
+		convertedValues := make([]any, len(values))
+		for i, value := range values {
+			if value == nil {
+				continue
+			}
+
+			castedValue, err := convertUUID(value)
+			if err != nil {
+				return nil, fmt.Errorf("failed to convert UUID %q at index %d for column %q: %w", value, i, columnMetadata.Name, err)
+			}
+
+			convertedValues[i] = castedValue
+		}
+
+		return convertedValues, nil
 	case "DATE":
 		// Handle date strings (may include timestamp portion)
 		if s, ok := value.(string); ok {
