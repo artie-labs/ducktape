@@ -287,6 +287,30 @@ func TestGetColumnMetadata(t *testing.T) {
 }
 
 func TestConvertValue(t *testing.T) {
+	t.Run("UUID array conversion", func(t *testing.T) {
+		metadata := ColumnMetadata{Name: "ids", Type: "UUID[]"}
+		result, err := ConvertValue([]any{"e7082e96-7190-4cc3-8ab4-bd27f1269f08", nil}, metadata)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		values, ok := result.([]any)
+		if !ok {
+			t.Fatalf("expected []any, got %T", result)
+		}
+		if len(values) != 2 || values[0] == nil || values[1] != nil {
+			t.Fatalf("unexpected UUID array values: %#v", values)
+		}
+	})
+
+	t.Run("invalid UUID array item", func(t *testing.T) {
+		metadata := ColumnMetadata{Name: "ids", Type: "UUID[]"}
+		_, err := ConvertValue([]any{"not-a-uuid"}, metadata)
+		if err == nil || !strings.Contains(err.Error(), "index 0") || !strings.Contains(err.Error(), `column "ids"`) {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
 	t.Run("DATE type conversions", func(t *testing.T) {
 		metadata := ColumnMetadata{Name: "test_date", Type: "DATE"}
 
