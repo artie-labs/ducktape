@@ -8,7 +8,7 @@ require (
 	github.com/artie-labs/ducktape/api v0.0.0
 	github.com/json-iterator/go v1.1.12
 	golang.org/x/net v0.54.0
-	golang.org/x/sync v0.21.0
+	golang.org/x/sync v0.22.0
 )
 
 replace github.com/artie-labs/ducktape/api => ./api
