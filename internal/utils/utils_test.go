@@ -62,21 +62,28 @@ func TestRowsToObjects(t *testing.T) {
 			t.Errorf("expected 3 objects, got %d", len(objects))
 		}
 
-		if objects[0]["id"] != int32(1) {
-			t.Errorf("expected id=1, got %v", objects[0]["id"])
+		obj0 := objects[0].(*OrderedMap)
+		id0, _ := obj0.Get("id")
+		if id0 != int32(1) {
+			t.Errorf("expected id=1, got %v", id0)
 		}
-		if objects[0]["name"] != "Alice" {
-			t.Errorf("expected name=Alice, got %v", objects[0]["name"])
+		name0, _ := obj0.Get("name")
+		if name0 != "Alice" {
+			t.Errorf("expected name=Alice, got %v", name0)
 		}
-		if objects[0]["active"] != true {
-			t.Errorf("expected active=true, got %v", objects[0]["active"])
+		active0, _ := obj0.Get("active")
+		if active0 != true {
+			t.Errorf("expected active=true, got %v", active0)
 		}
 
-		if objects[1]["name"] != "Bob" {
-			t.Errorf("expected name=Bob, got %v", objects[1]["name"])
+		obj1 := objects[1].(*OrderedMap)
+		name1, _ := obj1.Get("name")
+		if name1 != "Bob" {
+			t.Errorf("expected name=Bob, got %v", name1)
 		}
-		if objects[1]["active"] != false {
-			t.Errorf("expected active=false, got %v", objects[1]["active"])
+		active1, _ := obj1.Get("active")
+		if active1 != false {
+			t.Errorf("expected active=false, got %v", active1)
 		}
 	})
 
@@ -128,11 +135,14 @@ func TestRowsToObjects(t *testing.T) {
 			t.Errorf("expected 1 object, got %d", len(objects))
 		}
 
-		if objects[0]["name"] != nil {
-			t.Errorf("expected name=nil, got %v", objects[0]["name"])
+		obj := objects[0].(*OrderedMap)
+		name, _ := obj.Get("name")
+		if name != nil {
+			t.Errorf("expected name=nil, got %v", name)
 		}
-		if objects[0]["age"] != nil {
-			t.Errorf("expected age=nil, got %v", objects[0]["age"])
+		age, _ := obj.Get("age")
+		if age != nil {
+			t.Errorf("expected age=nil, got %v", age)
 		}
 	})
 
@@ -162,8 +172,10 @@ func TestRowsToObjects(t *testing.T) {
 			t.Errorf("expected 3 objects, got %d", len(objects))
 		}
 
-		if objects[0]["value"] != int32(42) {
-			t.Errorf("expected value=42, got %v", objects[0]["value"])
+		obj := objects[0].(*OrderedMap)
+		value, _ := obj.Get("value")
+		if value != int32(42) {
+			t.Errorf("expected value=42, got %v", value)
 		}
 	})
 }
@@ -956,15 +968,16 @@ func TestConvertValueRoundTrip(t *testing.T) {
 			t.Fatalf("expected 1 row, got %d", len(objects))
 		}
 
-		if objects[0]["event_date"] == nil {
+		obj := objects[0].(*OrderedMap)
+		if eventDate, _ := obj.Get("event_date"); eventDate == nil {
 			t.Error("event_date should not be nil")
 		}
 
-		if objects[0]["event_timestamp"] == nil {
+		if eventTimestamp, _ := obj.Get("event_timestamp"); eventTimestamp == nil {
 			t.Error("event_timestamp should not be nil")
 		}
 
-		if objects[0]["event_time"] == nil {
+		if eventTime, _ := obj.Get("event_time"); eventTime == nil {
 			t.Error("event_time should not be nil")
 		}
 	})

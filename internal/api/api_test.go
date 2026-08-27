@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/artie-labs/ducktape/api/pkg/ducktape"
+	"github.com/artie-labs/ducktape/internal/utils"
 	_ "github.com/duckdb/duckdb-go/v2"
 )
 
@@ -49,8 +50,10 @@ func TestQueryExecuteIntegration(t *testing.T) {
 			t.Fatalf("expected 1 row, got %d", len(result))
 		}
 
-		if result[0]["name"] != "test" {
-			t.Errorf("expected name='test', got %v", result[0]["name"])
+		obj := result[0].(*utils.OrderedMap)
+		name, _ := obj.Get("name")
+		if name != "test" {
+			t.Errorf("expected name='test', got %v", name)
 		}
 	})
 }

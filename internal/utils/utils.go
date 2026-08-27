@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
+	"encoding/json"
 	"fmt"
 	"math/big"
 	"strconv"
@@ -13,7 +14,58 @@ import (
 	"github.com/duckdb/duckdb-go/v2"
 )
 
-func RowsToObjects(rows *sql.Rows) ([]map[string]any, error) {
+// OrderedMap preserves the insertion order of keys when marshaling to JSON
+type OrderedMap struct {
+	keys   []string
+	values map[string]any
+}
+
+// MarshalJSON marshals the map while preserving column order
+func (om *OrderedMap) MarshalJSON() ([]byte, error) {
+	var buf strings.Builder
+	buf.WriteString("{")
+	for i, key := range om.keys {
+		if i > 0 {
+			buf.WriteString(",")
+		}
+		// Marshal the key
+		keyJSON, _ := json.Marshal(key)
+		buf.Write(keyJSON)
+		buf.WriteString(":")
+		// Marshal the value
+		valueJSON, err := json.Marshal(om.values[key])
+		if err != nil {
+			return nil, err
+		}
+		buf.Write(valueJSON)
+	}
+	buf.WriteString("}")
+	return []byte(buf.String()), nil
+}
+
+// Set adds or updates a key-value pair while preserving order (only adds to order on first insert)
+func (om *OrderedMap) Set(key string, value any) {
+	if _, exists := om.values[key]; !exists {
+		om.keys = append(om.keys, key)
+	}
+	om.values[key] = value
+}
+
+// Get retrieves a value by key
+func (om *OrderedMap) Get(key string) (any, bool) {
+	val, ok := om.values[key]
+	return val, ok
+}
+
+// NewOrderedMap creates a new OrderedMap
+func NewOrderedMap() *OrderedMap {
+	return &OrderedMap{
+		keys:   []string{},
+		values: make(map[string]any),
+	}
+}
+
+func RowsToObjects(rows *sql.Rows) ([]any, error) {
 	defer rows.Close()
 
 	columns, err := rows.Columns()
@@ -21,7 +73,7 @@ func RowsToObjects(rows *sql.Rows) ([]map[string]any, error) {
 		return nil, err
 	}
 
-	var objects []map[string]any
+	var objects []any
 	for rows.Next() {
 		row := make([]any, len(columns))
 		rowPointers := make([]any, len(columns))
@@ -33,9 +85,9 @@ func RowsToObjects(rows *sql.Rows) ([]map[string]any, error) {
 			return nil, err
 		}
 
-		object := make(map[string]any)
+		object := NewOrderedMap()
 		for i, column := range columns {
-			object[column] = row[i]
+			object.Set(column, row[i])
 		}
 
 		objects = append(objects, object)

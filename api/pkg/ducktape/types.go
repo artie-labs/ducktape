@@ -21,8 +21,8 @@ type QueryRequest struct {
 }
 
 type QueryResponse struct {
-	Rows  []map[string]any `json:"rows"`
-	Error *string          `json:"error"`
+	Rows  []any   `json:"rows"`
+	Error *string `json:"error"`
 }
 
 type ExecuteStatement struct {

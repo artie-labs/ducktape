@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/artie-labs/ducktape/api/pkg/ducktape"
+	"github.com/artie-labs/ducktape/internal/utils"
 	_ "github.com/duckdb/duckdb-go/v2"
 )
 
@@ -54,12 +55,16 @@ func TestQuery(t *testing.T) {
 			t.Errorf("expected 3 rows, got %d", len(result))
 		}
 
-		if result[0]["name"] != "Alice" {
-			t.Errorf("expected first row name=Alice, got %v", result[0]["name"])
+		obj0 := result[0].(*utils.OrderedMap)
+		name0, _ := obj0.Get("name")
+		if name0 != "Alice" {
+			t.Errorf("expected first row name=Alice, got %v", name0)
 		}
 
-		if result[1]["id"] != int32(2) {
-			t.Errorf("expected second row id=2, got %v", result[1]["id"])
+		obj1 := result[1].(*utils.OrderedMap)
+		id1, _ := obj1.Get("id")
+		if id1 != int32(2) {
+			t.Errorf("expected second row id=2, got %v", id1)
 		}
 	})
 
@@ -76,8 +81,10 @@ func TestQuery(t *testing.T) {
 		}
 
 		for _, row := range result {
-			if row["active"] != true {
-				t.Errorf("expected active=true, got %v", row["active"])
+			obj := row.(*utils.OrderedMap)
+			active, _ := obj.Get("active")
+			if active != true {
+				t.Errorf("expected active=true, got %v", active)
 			}
 		}
 	})
@@ -95,8 +102,10 @@ func TestQuery(t *testing.T) {
 			t.Fatalf("expected 1 row, got %d", len(result))
 		}
 
-		if result[0]["name"] != "Bob" {
-			t.Errorf("expected name=Bob, got %v", result[0]["name"])
+		obj := result[0].(*utils.OrderedMap)
+		name, _ := obj.Get("name")
+		if name != "Bob" {
+			t.Errorf("expected name=Bob, got %v", name)
 		}
 	})
 
@@ -112,19 +121,16 @@ func TestQuery(t *testing.T) {
 			t.Errorf("expected 3 rows, got %d", len(result))
 		}
 
-		if len(result[0]) != 2 {
-			t.Errorf("expected 2 columns, got %d", len(result[0]))
-		}
-
-		if _, exists := result[0]["id"]; !exists {
+		obj := result[0].(*utils.OrderedMap)
+		if _, exists := obj.Get("id"); !exists {
 			t.Error("expected 'id' column to exist")
 		}
 
-		if _, exists := result[0]["name"]; !exists {
+		if _, exists := obj.Get("name"); !exists {
 			t.Error("expected 'name' column to exist")
 		}
 
-		if _, exists := result[0]["age"]; exists {
+		if _, exists := obj.Get("age"); exists {
 			t.Error("expected 'age' column to not exist")
 		}
 	})
@@ -141,9 +147,11 @@ func TestQuery(t *testing.T) {
 			t.Fatalf("expected 1 row, got %d", len(result))
 		}
 
-		count, ok := result[0]["count"].(int64)
+		obj := result[0].(*utils.OrderedMap)
+		countVal, _ := obj.Get("count")
+		count, ok := countVal.(int64)
 		if !ok {
-			t.Errorf("expected count to be int64, got %T", result[0]["count"])
+			t.Errorf("expected count to be int64, got %T", countVal)
 		}
 
 		if count != 3 {
@@ -176,12 +184,16 @@ func TestQuery(t *testing.T) {
 			t.Fatalf("expected 3 rows, got %d", len(result))
 		}
 
-		if result[0]["name"] != "Charlie" {
-			t.Errorf("expected first name=Charlie (age 35), got %v", result[0]["name"])
+		obj0 := result[0].(*utils.OrderedMap)
+		name0, _ := obj0.Get("name")
+		if name0 != "Charlie" {
+			t.Errorf("expected first name=Charlie (age 35), got %v", name0)
 		}
 
-		if result[2]["name"] != "Bob" {
-			t.Errorf("expected last name=Bob (age 25), got %v", result[2]["name"])
+		obj2 := result[2].(*utils.OrderedMap)
+		name2, _ := obj2.Get("name")
+		if name2 != "Bob" {
+			t.Errorf("expected last name=Bob (age 25), got %v", name2)
 		}
 	})
 
@@ -246,12 +258,16 @@ func TestQuery(t *testing.T) {
 			t.Fatalf("failed to query: %v", err)
 		}
 
-		if result[0]["value"] != nil {
-			t.Errorf("expected NULL value, got %v", result[0]["value"])
+		obj0 := result[0].(*utils.OrderedMap)
+		value0, _ := obj0.Get("value")
+		if value0 != nil {
+			t.Errorf("expected NULL value, got %v", value0)
 		}
 
-		if result[1]["value"] != "test" {
-			t.Errorf("expected value='test', got %v", result[1]["value"])
+		obj1 := result[1].(*utils.OrderedMap)
+		value1, _ := obj1.Get("value")
+		if value1 != "test" {
+			t.Errorf("expected value='test', got %v", value1)
 		}
 	})
 

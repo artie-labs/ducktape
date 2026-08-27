@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/artie-labs/ducktape/api/pkg/ducktape"
+	"github.com/artie-labs/ducktape/internal/utils"
 	_ "github.com/duckdb/duckdb-go/v2"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
@@ -119,8 +120,10 @@ func TestAppend(t *testing.T) {
 			t.Errorf("expected 3 rows in table, got %d", len(result))
 		}
 
-		if result[0]["name"] != "Alice" {
-			t.Errorf("expected first row name=Alice, got %v", result[0]["name"])
+		obj := result[0].(*utils.OrderedMap)
+		name, _ := obj.Get("name")
+		if name != "Alice" {
+			t.Errorf("expected first row name=Alice, got %v", name)
 		}
 	})
 
@@ -257,8 +260,10 @@ func TestAppend(t *testing.T) {
 			t.Fatalf("expected 1 row, got %d", len(result))
 		}
 
-		if result[0]["id"] != int32(1) {
-			t.Errorf("expected id=1, got %v", result[0]["id"])
+		obj := result[0].(*utils.OrderedMap)
+		id, _ := obj.Get("id")
+		if id != int32(1) {
+			t.Errorf("expected id=1, got %v", id)
 		}
 	})
 
@@ -295,12 +300,16 @@ func TestAppend(t *testing.T) {
 			t.Fatalf("failed to query: %v", err)
 		}
 
-		if result[0]["value"] != nil {
-			t.Errorf("expected NULL value, got %v", result[0]["value"])
+		obj0 := result[0].(*utils.OrderedMap)
+		value0, _ := obj0.Get("value")
+		if value0 != nil {
+			t.Errorf("expected NULL value, got %v", value0)
 		}
 
-		if result[1]["count"] != nil {
-			t.Errorf("expected NULL count, got %v", result[1]["count"])
+		obj1 := result[1].(*utils.OrderedMap)
+		count1, _ := obj1.Get("count")
+		if count1 != nil {
+			t.Errorf("expected NULL count, got %v", count1)
 		}
 	})
 
@@ -337,12 +346,16 @@ func TestAppend(t *testing.T) {
 			t.Fatalf("failed to query: %v", err)
 		}
 
-		if result[0]["active"] != true {
-			t.Errorf("expected active=true, got %v", result[0]["active"])
+		obj0 := result[0].(*utils.OrderedMap)
+		active0, _ := obj0.Get("active")
+		if active0 != true {
+			t.Errorf("expected active=true, got %v", active0)
 		}
 
-		if result[1]["verified"] != true {
-			t.Errorf("expected verified=true, got %v", result[1]["verified"])
+		obj1 := result[1].(*utils.OrderedMap)
+		verified1, _ := obj1.Get("verified")
+		if verified1 != true {
+			t.Errorf("expected verified=true, got %v", verified1)
 		}
 	})
 
@@ -507,9 +520,11 @@ func TestAppend(t *testing.T) {
 			t.Fatalf("failed to query: %v", err)
 		}
 
-		count, ok := result[0]["count"].(int64)
+		obj := result[0].(*utils.OrderedMap)
+		countVal, _ := obj.Get("count")
+		count, ok := countVal.(int64)
 		if !ok {
-			t.Fatalf("expected count to be int64, got %T", result[0]["count"])
+			t.Fatalf("expected count to be int64, got %T", countVal)
 		}
 
 		if count != 1000 {
