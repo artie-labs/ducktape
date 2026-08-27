@@ -17,6 +17,8 @@ import (
 type Client struct {
 	baseURL    string
 	httpClient *http.Client
+	username   string
+	password   string
 }
 
 func NewClient(baseURL string) *Client {
@@ -30,6 +32,12 @@ func NewClient(baseURL string) *Client {
 	return &Client{baseURL: baseURL, httpClient: &http.Client{Transport: tr}}
 }
 
+// SetBasicAuth sets the username and password for HTTP basic authentication.
+func (c *Client) SetBasicAuth(username, password string) {
+	c.username = username
+	c.password = password
+}
+
 func (c *Client) Ping(
 	ctx context.Context,
 	connectionString string,
@@ -38,6 +46,10 @@ func (c *Client) Ping(
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return err
+	}
+
+	if c.username != "" || c.password != "" {
+		req.SetBasicAuth(c.username, c.password)
 	}
 
 	req.Header.Set(DuckDBConnectionStringHeader, connectionString)
@@ -73,6 +85,10 @@ func (c *Client) Execute(
 		return nil, err
 	}
 
+	if c.username != "" || c.password != "" {
+		req.SetBasicAuth(c.username, c.password)
+	}
+
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set(DuckDBConnectionStringHeader, connectionString)
 
@@ -81,6 +97,10 @@ func (c *Client) Execute(
 		return nil, err
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to execute: %s", resp.Status)
+	}
 
 	responseBody, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -107,6 +127,10 @@ func (c *Client) Query(
 		return nil, err
 	}
 
+	if c.username != "" || c.password != "" {
+		req.SetBasicAuth(c.username, c.password)
+	}
+
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set(DuckDBConnectionStringHeader, connectionString)
 
@@ -115,6 +139,10 @@ func (c *Client) Query(
 		return nil, err
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to query: %s", resp.Status)
+	}
 
 	responseBody, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -137,6 +165,10 @@ func (c *Client) Append(
 	req, err := http.NewRequestWithContext(ctx, "POST", url, nil)
 	if err != nil {
 		return nil, err
+	}
+
+	if c.username != "" || c.password != "" {
+		req.SetBasicAuth(c.username, c.password)
 	}
 
 	req.Header.Set("Content-Type", "application/octet-stream")
@@ -182,6 +214,10 @@ func (c *Client) Append(
 		return nil, err
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to append: %s", resp.Status)
+	}
 
 	responseBody, err := io.ReadAll(resp.Body)
 	if err != nil {

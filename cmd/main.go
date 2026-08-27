@@ -56,6 +56,14 @@ func main() {
 	})
 	slog.SetDefault(logger)
 
+	username := os.Getenv("DUCKTAPE_USERNAME")
+	password := os.Getenv("DUCKTAPE_PASSWORD")
+	if username != "" && password != "" {
+		slog.Info("Basic authentication is enabled.")
+	} else if username != "" || password != "" {
+		slog.Warn("Basic authentication is disabled because both DUCKTAPE_USERNAME and DUCKTAPE_PASSWORD must be non-empty.")
+	}
+
 	mux := http.NewServeMux()
 
 	api.RegisterApiRoutes(mux)
