@@ -10,6 +10,7 @@ import (
 	jsoniter "github.com/json-iterator/go"
 
 	"github.com/artie-labs/ducktape/api/pkg/ducktape"
+	"github.com/artie-labs/ducktape/internal/utils"
 )
 
 var json = jsoniter.ConfigCompatibleWithStandardLibrary
@@ -81,4 +82,8 @@ func handleInternalServerErrorJSON[T any](w http.ResponseWriter, response T, err
 		return
 	}
 	w.Write(body)
+}
+
+func Cleanup() error {
+	return utils.ClearCache()
 }

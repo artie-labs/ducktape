@@ -6,21 +6,107 @@ import (
 	"database/sql/driver"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/url"
+	"os"
 	"sort"
 	"strings"
-	"os"
-	"log/slog"
+	"sync"
+	"time"
 
 	"github.com/duckdb/duckdb-go/v2"
 )
 
-type Connector struct {
+type cachedConn struct {
 	connector *duckdb.Connector
 	db        *sql.DB
 }
 
+var (
+	cacheMu      sync.RWMutex
+	connCache    = make(map[string]*cachedConn)
+	cacheEnabled = true
+)
+
+// SetCacheEnabled enables or disables the connection cache.
+func SetCacheEnabled(enabled bool) {
+	cacheMu.Lock()
+	defer cacheMu.Unlock()
+	cacheEnabled = enabled
+}
+
+// ClearCache closes all cached connections and empties the cache.
+func ClearCache() error {
+	cacheMu.Lock()
+	defer cacheMu.Unlock()
+
+	var errs []error
+	for dsn, conn := range connCache {
+		var err1, err2 error
+		if conn.db != nil {
+			if err := conn.db.Close(); err != nil {
+				err1 = fmt.Errorf("failed to close cached db for %s: %w", dsn, err)
+			}
+		}
+		if conn.connector != nil {
+			if err := conn.connector.Close(); err != nil {
+				err2 = fmt.Errorf("failed to close cached connector for %s: %w", dsn, err)
+			}
+		}
+		if err := errors.Join(err1, err2); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	connCache = make(map[string]*cachedConn)
+	return errors.Join(errs...)
+}
+
+type Connector struct {
+	connector *duckdb.Connector
+	db        *sql.DB
+	isCached  bool
+}
+
 func NewConnector(ctx context.Context, dsn string) (*Connector, error) {
+	cacheMu.RLock()
+	if cacheEnabled {
+		if conn, ok := connCache[dsn]; ok {
+			cacheMu.RUnlock()
+			return &Connector{connector: conn.connector, db: conn.db, isCached: true}, nil
+		}
+	}
+	cacheMu.RUnlock()
+
+	// Cache miss. Acquire write lock to initialize.
+	cacheMu.Lock()
+	defer cacheMu.Unlock()
+
+	// Double-checked lock validation
+	if cacheEnabled {
+		if conn, ok := connCache[dsn]; ok {
+			return &Connector{connector: conn.connector, db: conn.db, isCached: true}, nil
+		}
+	}
+
+	conn, err := createConnector(ctx, dsn)
+	if err != nil {
+		return nil, err
+	}
+
+	if cacheEnabled {
+		// Set sensible connection pool defaults on the cached DB
+		conn.db.SetMaxIdleConns(10)
+		conn.db.SetMaxOpenConns(1)
+		conn.db.SetConnMaxIdleTime(10 * time.Minute)
+
+		connCache[dsn] = &cachedConn{connector: conn.connector, db: conn.db}
+		return &Connector{connector: conn.connector, db: conn.db, isCached: true}, nil
+	}
+
+	return conn, nil
+}
+
+func createConnector(ctx context.Context, dsn string) (*Connector, error) {
 	if strings.HasPrefix(dsn, "rcfile:") {
 		rcFilePath := strings.TrimPrefix(dsn, "rcfile:")
 		slog.Debug("using DUCKDBRC file", "path", rcFilePath)
@@ -32,7 +118,7 @@ func NewConnector(ctx context.Context, dsn string) (*Connector, error) {
 		rcFileData := string(data)
 
 		c, err := duckdb.NewConnector(":memory:", func(execer driver.ExecerContext) error {
-			_, err :=execer.ExecContext(ctx, rcFileData, nil)
+			_, err := execer.ExecContext(ctx, rcFileData, nil)
 			if err != nil {
 				return err
 			}
@@ -42,7 +128,6 @@ func NewConnector(ctx context.Context, dsn string) (*Connector, error) {
 			return nil, fmt.Errorf("failed to create connector: %w", err)
 		}
 		return &Connector{connector: c, db: sql.OpenDB(c)}, nil
-		
 	}
 	
 	target, params := parseDSN(dsn)
@@ -128,6 +213,9 @@ func (c *Connector) GetDB() *sql.DB {
 }
 
 func (c *Connector) Close() error {
+	if c.isCached {
+		return nil
+	}
 	var err1, err2 error
 	if c.db != nil {
 		err := c.db.Close()
