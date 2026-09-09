@@ -1,11 +1,10 @@
 module github.com/artie-labs/ducktape
 
-go 1.25.3
-
-require github.com/duckdb/duckdb-go/v2 v2.10505.0
+go 1.27.1
 
 require (
 	github.com/artie-labs/ducktape/api v0.0.0
+	github.com/duckdb/duckdb-go/v2 v2.10505.0
 	github.com/json-iterator/go v1.1.12
 	golang.org/x/net v0.58.0
 	golang.org/x/sync v0.22.0
