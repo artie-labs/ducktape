@@ -17,7 +17,7 @@ jobs:
     environment: release
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           # goreleaser needs full history + tags for the changelog and version.
           fetch-depth: 0
