@@ -5,6 +5,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"os"
 	"sync/atomic"
 
 	jsoniter "github.com/json-iterator/go"
@@ -37,10 +38,32 @@ func RegisterHealthCheckRoutes(mux *http.ServeMux) {
 }
 
 func RegisterApiRoutes(mux *http.ServeMux) {
-	mux.HandleFunc(fmt.Sprintf("POST %s", ducktape.ExecuteRoute), handleExecute)
-	mux.HandleFunc(fmt.Sprintf("POST %s", ducktape.QueryRoute), handleQuery)
-	mux.HandleFunc(fmt.Sprintf("POST %s", ducktape.AppendRoute), handleAppend)
-	mux.HandleFunc(fmt.Sprintf("GET %s", ducktape.PingRoute), handlePing)
+	username := os.Getenv("DUCKTAPE_USERNAME")
+	password := os.Getenv("DUCKTAPE_PASSWORD")
+
+	var wrap func(http.HandlerFunc) http.HandlerFunc
+	if username != "" && password != "" {
+		wrap = func(next http.HandlerFunc) http.HandlerFunc {
+			return func(w http.ResponseWriter, r *http.Request) {
+				u, p, ok := r.BasicAuth()
+				if !ok || u != username || p != password {
+					w.Header().Set("WWW-Authenticate", `Basic realm="restricted", charset="UTF-8"`)
+					http.Error(w, "Unauthorized", http.StatusUnauthorized)
+					return
+				}
+				next(w, r)
+			}
+		}
+	} else {
+		wrap = func(next http.HandlerFunc) http.HandlerFunc {
+			return next
+		}
+	}
+
+	mux.HandleFunc(fmt.Sprintf("POST %s", ducktape.ExecuteRoute), wrap(handleExecute))
+	mux.HandleFunc(fmt.Sprintf("POST %s", ducktape.QueryRoute), wrap(handleQuery))
+	mux.HandleFunc(fmt.Sprintf("POST %s", ducktape.AppendRoute), wrap(handleAppend))
+	mux.HandleFunc(fmt.Sprintf("GET %s", ducktape.PingRoute), wrap(handlePing))
 }
 
 func getRequestBody[T any](r *http.Request) (T, error) {
