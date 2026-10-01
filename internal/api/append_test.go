@@ -12,6 +12,7 @@ import (
 
 	"github.com/artie-labs/ducktape/api/pkg/ducktape"
 	_ "github.com/duckdb/duckdb-go/v2"
+	"github.com/goccy/go-json"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
 )

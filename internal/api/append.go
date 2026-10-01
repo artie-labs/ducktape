@@ -17,6 +17,7 @@ import (
 	"github.com/artie-labs/ducktape/api/pkg/ducktape"
 	"github.com/artie-labs/ducktape/internal/utils"
 	"github.com/duckdb/duckdb-go/v2"
+	"github.com/goccy/go-json"
 )
 
 var (
