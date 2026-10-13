@@ -3,6 +3,7 @@ package utils
 import (
 	"context"
 	"database/sql"
+	"encoding/hex"
 	"math/big"
 	"strings"
 	"testing"
@@ -966,6 +967,83 @@ func TestConvertValueRoundTrip(t *testing.T) {
 
 		if objects[0]["event_time"] == nil {
 			t.Error("event_time should not be nil")
+		}
+	})
+}
+
+func TestConvertValueGeometry(t *testing.T) {
+	// POINT(1 2) as WKB
+	pointWKB := "AQEAAAAAAAAAAADwPwAAAAAAAABA"
+
+	t.Run("base64 WKB", func(t *testing.T) {
+		for _, columnType := range []string{"GEOMETRY", "GEOMETRY('OGC:CRS84')"} {
+			result, err := ConvertValue(pointWKB, ColumnMetadata{Name: "geom", Type: columnType})
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got := hex.EncodeToString(result.([]byte)); got != "0101000000000000000000f03f0000000000000040" {
+				t.Fatalf("unexpected WKB for %s: %s", columnType, got)
+			}
+		}
+	})
+
+	t.Run("invalid base64", func(t *testing.T) {
+		_, err := ConvertValue("POINT(1 2)", ColumnMetadata{Name: "geom", Type: "GEOMETRY"})
+		if err == nil || !strings.Contains(err.Error(), `column "geom"`) {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("not a string", func(t *testing.T) {
+		_, err := ConvertValue(map[string]any{"type": "Point"}, ColumnMetadata{Name: "geom", Type: "GEOMETRY"})
+		if err == nil || !strings.Contains(err.Error(), "expected base64 WKB") {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("appender round trip", func(t *testing.T) {
+		connector, err := duckdb.NewConnector("", nil)
+		if err != nil {
+			t.Fatalf("failed to create connector: %v", err)
+		}
+		db := sql.OpenDB(connector)
+		defer db.Close()
+
+		if _, err := db.Exec(`CREATE TABLE test_geometry (id INTEGER, geom GEOMETRY('OGC:CRS84'))`); err != nil {
+			t.Fatalf("failed to create table: %v", err)
+		}
+
+		conn, err := connector.Connect(context.Background())
+		if err != nil {
+			t.Fatalf("failed to connect: %v", err)
+		}
+		defer conn.Close()
+
+		appender, err := duckdb.NewAppenderFromConn(conn, "", "test_geometry")
+		if err != nil {
+			t.Fatalf("failed to create appender: %v", err)
+		}
+
+		// POINT Z (1 2 3)
+		for id, value := range []string{pointWKB, "AekDAAAAAAAAAADwPwAAAAAAAABAAAAAAAAACEA="} {
+			converted, err := ConvertValue(value, ColumnMetadata{Name: "geom", Type: "GEOMETRY('OGC:CRS84')"})
+			if err != nil {
+				t.Fatalf("failed to convert: %v", err)
+			}
+			if err := appender.AppendRow(int32(id), converted); err != nil {
+				t.Fatalf("failed to append: %v", err)
+			}
+		}
+		if err := appender.Close(); err != nil {
+			t.Fatalf("failed to close appender: %v", err)
+		}
+
+		var text string
+		if err := db.QueryRow("SELECT string_agg(ST_AsText(geom), ', ' ORDER BY id) FROM test_geometry").Scan(&text); err != nil {
+			t.Fatalf("failed to query: %v", err)
+		}
+		if text != "POINT (1 2), POINT Z (1 2 3)" {
+			t.Fatalf("unexpected geometries: %s", text)
 		}
 	})
 }
