@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/artie-labs/base/lib/sqlutil"
 	"github.com/artie-labs/ducktape/api/pkg/ducktape"
 	"github.com/artie-labs/ducktape/internal/utils"
 	_ "github.com/duckdb/duckdb-go/v2"
@@ -80,7 +81,7 @@ func Query(ctx context.Context, dsn string, request ducktape.QueryRequest) ([]ma
 	}
 	defer rows.Close()
 
-	objects, err := utils.RowsToObjects(rows)
+	objects, err := sqlutil.RowsToObjects(rows)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert rows to objects: %w", err)
 	}

@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/artie-labs/base/lib/sqlutil"
 	"github.com/duckdb/duckdb-go/v2"
 	_ "github.com/duckdb/duckdb-go/v2"
 )
@@ -53,7 +54,7 @@ func TestRowsToObjects(t *testing.T) {
 			t.Fatalf("failed to query: %v", err)
 		}
 
-		objects, err := RowsToObjects(rows)
+		objects, err := sqlutil.RowsToObjects(rows)
 		if err != nil {
 			t.Fatalf("RowsToObjects failed: %v", err)
 		}
@@ -92,7 +93,7 @@ func TestRowsToObjects(t *testing.T) {
 			t.Fatalf("failed to query: %v", err)
 		}
 
-		objects, err := RowsToObjects(rows)
+		objects, err := sqlutil.RowsToObjects(rows)
 		if err != nil {
 			t.Fatalf("RowsToObjects failed: %v", err)
 		}
@@ -119,7 +120,7 @@ func TestRowsToObjects(t *testing.T) {
 			t.Fatalf("failed to query: %v", err)
 		}
 
-		objects, err := RowsToObjects(rows)
+		objects, err := sqlutil.RowsToObjects(rows)
 		if err != nil {
 			t.Fatalf("RowsToObjects failed: %v", err)
 		}
@@ -153,7 +154,7 @@ func TestRowsToObjects(t *testing.T) {
 			t.Fatalf("failed to query: %v", err)
 		}
 
-		objects, err := RowsToObjects(rows)
+		objects, err := sqlutil.RowsToObjects(rows)
 		if err != nil {
 			t.Fatalf("RowsToObjects failed: %v", err)
 		}
@@ -947,7 +948,7 @@ func TestConvertValueRoundTrip(t *testing.T) {
 			t.Fatalf("failed to query: %v", err)
 		}
 
-		objects, err := RowsToObjects(rows)
+		objects, err := sqlutil.RowsToObjects(rows)
 		if err != nil {
 			t.Fatalf("RowsToObjects failed: %v", err)
 		}
@@ -1004,7 +1005,7 @@ func BenchmarkRowsToObjects(b *testing.B) {
 			b.Fatalf("failed to query: %v", err)
 		}
 
-		_, err = RowsToObjects(rows)
+		_, err = sqlutil.RowsToObjects(rows)
 		if err != nil {
 			b.Fatalf("RowsToObjects failed: %v", err)
 		}
