@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
+	"encoding/base64"
 	"fmt"
 	"math/big"
 	"strconv"
@@ -185,6 +186,19 @@ func ConvertValue(value any, columnMetadata ColumnMetadata) (driver.Value, error
 		}
 		return value, nil
 	default:
+		// GEOMETRY may carry a coordinate reference system, e.g. GEOMETRY('OGC:CRS84'). The appender takes WKB, which
+		// JSON carries as base64.
+		if metadataType == "GEOMETRY" || strings.HasPrefix(metadataType, "GEOMETRY(") {
+			s, ok := value.(string)
+			if !ok {
+				return nil, fmt.Errorf("expected base64 WKB for column %q, got %T", columnMetadata.Name, value)
+			}
+			wkb, err := base64.StdEncoding.DecodeString(s)
+			if err != nil {
+				return nil, fmt.Errorf("failed to decode base64 WKB for column %q: %w", columnMetadata.Name, err)
+			}
+			return wkb, nil
+		}
 		// Handle parameterized types like DECIMAL(15,2), NUMERIC(10,0)
 		if strings.HasPrefix(metadataType, "DECIMAL") || strings.HasPrefix(metadataType, "NUMERIC") {
 			if s, ok := value.(string); ok {
