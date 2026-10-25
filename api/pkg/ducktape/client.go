@@ -147,15 +147,21 @@ func (c *Client) Append(
 
 	pr, pw := io.Pipe()
 
+	// streamErr is an error from the iterator or from marshalling a row. It's only read after done is closed.
+	var streamErr error
+	done := make(chan struct{})
 	go func() {
+		defer close(done)
 		bw := bufio.NewWriterSize(pw, RecommendedBufferSize)
 		for rowMessageResult := range streamIterator {
-			if rowMessageResult.Error != nil {
-				pw.CloseWithError(fmt.Errorf("error in row message result: %s", *rowMessageResult.Error))
+			if rowMessageResult.Err != nil {
+				streamErr = fmt.Errorf("error in row message result: %w", rowMessageResult.Err)
+				pw.CloseWithError(streamErr)
 				return
 			}
 			bytes, err := marshalFunc(rowMessageResult.Row)
 			if err != nil {
+				streamErr = err
 				pw.CloseWithError(err)
 				return
 			}
@@ -177,13 +183,21 @@ func (c *Client) Append(
 
 	req.Body = pr
 
+	var responseBody []byte
 	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, err
+	if err == nil {
+		responseBody, err = io.ReadAll(resp.Body)
+		resp.Body.Close()
 	}
-	defer resp.Body.Close()
 
-	responseBody, err := io.ReadAll(resp.Body)
+	// Unblock the writer if the request ended before it sent every row, then wait for it so streamErr is safe to read.
+	pr.Close()
+	<-done
+
+	// The iterator's own error explains the failure better than whatever the HTTP request saw.
+	if streamErr != nil {
+		return nil, streamErr
+	}
 	if err != nil {
 		return nil, err
 	}
