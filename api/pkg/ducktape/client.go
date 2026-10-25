@@ -192,7 +192,12 @@ func (c *Client) Append(
 
 	// Unblock the writer if the request ended before it sent every row, then wait for it so streamErr is safe to read.
 	pr.Close()
-	<-done
+	select {
+	case <-done:
+	case <-ctx.Done():
+		// The iterator is blocked inside itself; leave the goroutine to finish on its own rather than hang past ctx.
+		return nil, ctx.Err()
+	}
 
 	// The iterator's own error explains the failure better than whatever the HTTP request saw.
 	if streamErr != nil {
