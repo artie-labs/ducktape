@@ -195,8 +195,13 @@ func (c *Client) Append(
 	select {
 	case <-done:
 	case <-ctx.Done():
-		// The iterator is blocked inside itself; leave the goroutine to finish on its own rather than hang past ctx.
-		return nil, ctx.Err()
+		// select picks at random when both are ready, so prefer the writer's result if it has finished.
+		select {
+		case <-done:
+		default:
+			// The iterator is blocked inside itself; leave the goroutine to finish on its own rather than hang past ctx.
+			return nil, ctx.Err()
+		}
 	}
 
 	// The iterator's own error explains the failure better than whatever the HTTP request saw.
