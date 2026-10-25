@@ -1,7 +1,6 @@
 package ducktape
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -9,7 +8,6 @@ import (
 	"net/http/httptest"
 	"sync/atomic"
 	"testing"
-	"time"
 
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
@@ -41,8 +39,8 @@ func earlyErrorHandler(w http.ResponseWriter, _ *http.Request) {
 func marshalRow(r RowMessage) ([]byte, error) { return json.Marshal(r) }
 
 // appendWith runs Append against server. onResponse, if set, runs when Append unmarshals the server's response.
-func appendWith(ctx context.Context, server *httptest.Server, iterator func(yield func(RowMessageResult) bool), marshalFunc func(RowMessage) ([]byte, error), onResponse func()) (*AppendResponse, error) {
-	return NewClient(server.URL).Append(ctx, "dsn", "db", "schema", "table", iterator, marshalFunc,
+func appendWith(t *testing.T, server *httptest.Server, iterator func(yield func(RowMessageResult) bool), marshalFunc func(RowMessage) ([]byte, error), onResponse func()) (*AppendResponse, error) {
+	return NewClient(server.URL).Append(t.Context(), "dsn", "db", "schema", "table", iterator, marshalFunc,
 		func(b []byte) (*AppendResponse, error) {
 			if onResponse != nil {
 				onResponse()
@@ -57,7 +55,7 @@ func TestAppend(t *testing.T) {
 	{
 		// An error from the iterator comes back from Append, so callers can match it.
 		server := newTestServer(t, readAllHandler)
-		_, err := appendWith(t.Context(), server, func(yield func(RowMessageResult) bool) {
+		_, err := appendWith(t, server, func(yield func(RowMessageResult) bool) {
 			if !yield(RowMessageResult{Row: RowMessage{Values: []any{1}}}) {
 				return
 			}
@@ -71,7 +69,7 @@ func TestAppend(t *testing.T) {
 	{
 		// A marshal error comes back from Append too.
 		server := newTestServer(t, readAllHandler)
-		_, err := appendWith(t.Context(), server, func(yield func(RowMessageResult) bool) {
+		_, err := appendWith(t, server, func(yield func(RowMessageResult) bool) {
 			yield(RowMessageResult{Row: RowMessage{Values: []any{1}}})
 		}, func(RowMessage) ([]byte, error) { return nil, stopError{} }, nil)
 		var stopErr stopError
@@ -83,7 +81,7 @@ func TestAppend(t *testing.T) {
 		// When the server answers with an error first, that error wins over an iterator error that comes after it.
 		server := newTestServer(t, earlyErrorHandler)
 		gotResponse, writerFailed := make(chan struct{}), make(chan struct{})
-		resp, err := appendWith(t.Context(), server, func(yield func(RowMessageResult) bool) {
+		resp, err := appendWith(t, server, func(yield func(RowMessageResult) bool) {
 			defer close(writerFailed)
 			if !yield(RowMessageResult{Row: RowMessage{Values: []any{1}}}) {
 				return
@@ -107,7 +105,7 @@ func TestAppend(t *testing.T) {
 		server := newTestServer(t, earlyErrorHandler)
 		var responded atomic.Bool
 		var rowsAfterResponse atomic.Int64
-		_, err := appendWith(t.Context(), server, func(yield func(RowMessageResult) bool) {
+		_, err := appendWith(t, server, func(yield func(RowMessageResult) bool) {
 			for {
 				if responded.Load() {
 					rowsAfterResponse.Add(1)
@@ -123,18 +121,6 @@ func TestAppend(t *testing.T) {
 		// Without the stop, the writer keeps going until its 1 MB buffer flushes: about 95k of these rows.
 		if n := rowsAfterResponse.Load(); n > 1000 {
 			t.Fatalf("expected the writer to stop soon after the response, but it pulled %d more rows", n)
-		}
-	}
-	{
-		// An iterator blocked inside itself doesn't keep Append waiting on the writer past ctx.
-		server := newTestServer(t, readAllHandler)
-		unblock := make(chan struct{})
-		defer close(unblock)
-		ctx, cancel := context.WithTimeout(t.Context(), 200*time.Millisecond)
-		defer cancel()
-		_, err := appendWith(ctx, server, func(yield func(RowMessageResult) bool) { <-unblock }, marshalRow, nil)
-		if !errors.Is(err, context.DeadlineExceeded) {
-			t.Fatalf("expected context.DeadlineExceeded, got %v", err)
 		}
 	}
 }

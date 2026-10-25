@@ -124,8 +124,8 @@ func (c *Client) Query(
 	return unmarshalFunc(responseBody)
 }
 
-// Append streams rows from streamIterator to the server. It doesn't return while streamIterator is still running,
-// unless ctx ends first, so an iterator that can block should stop blocking when ctx ends.
+// Append streams rows from streamIterator to the server. It waits for streamIterator to return, so the iterator
+// shouldn't block.
 func (c *Client) Append(
 	ctx context.Context,
 	connectionString string,
@@ -191,39 +191,29 @@ func (c *Client) Append(
 
 	req.Body = pr
 
-	var appendResp *AppendResponse
-	resp, err := c.httpClient.Do(req)
-	if err == nil {
-		var responseBody []byte
-		responseBody, err = io.ReadAll(resp.Body)
-		resp.Body.Close()
-		if err == nil {
-			appendResp, err = unmarshalFunc(responseBody)
+	appendResp, err := func() (*AppendResponse, error) {
+		resp, err := c.httpClient.Do(req)
+		if err != nil {
+			return nil, err
 		}
-	}
+		defer resp.Body.Close()
+
+		responseBody, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, err
+		}
+		return unmarshalFunc(responseBody)
+	}()
 
 	// The request is over. Stop the writer before its next row and unblock a write in progress, then wait for it, so
 	// streamErr is safe to read and the iterator isn't running once Append returns.
 	stopped.Store(true)
 	pr.Close()
-	select {
-	case <-done:
-	case <-ctx.Done():
-		// select picks at random when both are ready, so prefer the writer's result if it has finished.
-		select {
-		case <-done:
-		default:
-			// The iterator is blocked inside itself; leave the goroutine to finish on its own rather than hang past ctx.
-			return nil, ctx.Err()
-		}
-	}
+	<-done
 
-	if appendResp != nil && appendResp.Error != nil {
-		// The server answered with its own error, which came before anything the writer hit afterwards.
-		return appendResp, nil
-	}
-	// Otherwise the iterator's own error explains the failure better than whatever the HTTP request saw.
-	if streamErr != nil {
+	// The iterator's own error explains the failure better than whatever the HTTP request saw, unless the server
+	// answered with its own error first.
+	if streamErr != nil && (appendResp == nil || appendResp.Error == nil) {
 		return nil, streamErr
 	}
 	return appendResp, err
