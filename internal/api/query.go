@@ -10,6 +10,7 @@ import (
 	"github.com/artie-labs/ducktape/api/pkg/ducktape"
 	"github.com/artie-labs/ducktape/internal/utils"
 	_ "github.com/duckdb/duckdb-go/v2"
+	"github.com/goccy/go-json"
 )
 
 func handleQuery(w http.ResponseWriter, r *http.Request) {

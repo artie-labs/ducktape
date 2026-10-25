@@ -7,12 +7,10 @@ import (
 	"net/http"
 	"sync/atomic"
 
-	jsoniter "github.com/json-iterator/go"
-
 	"github.com/artie-labs/ducktape/api/pkg/ducktape"
+	"github.com/goccy/go-json"
 )
 
-var json = jsoniter.ConfigCompatibleWithStandardLibrary
 var draining atomic.Bool
 
 func SetDraining(v bool) {
