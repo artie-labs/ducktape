@@ -10,6 +10,7 @@ import (
 	"iter"
 	"net"
 	"net/http"
+	"sync/atomic"
 
 	"golang.org/x/net/http2"
 )
@@ -123,6 +124,8 @@ func (c *Client) Query(
 	return unmarshalFunc(responseBody)
 }
 
+// Append streams rows from streamIterator to the server. It waits for streamIterator to return, so the iterator
+// shouldn't block.
 func (c *Client) Append(
 	ctx context.Context,
 	connectionString string,
@@ -147,15 +150,26 @@ func (c *Client) Append(
 
 	pr, pw := io.Pipe()
 
+	// streamErr is an error from the iterator or from marshalling a row. It's only read after done is closed.
+	var streamErr error
+	// stopped tells the writer the request is over, so it stops pulling rows instead of filling its buffer first.
+	var stopped atomic.Bool
+	done := make(chan struct{})
 	go func() {
+		defer close(done)
 		bw := bufio.NewWriterSize(pw, RecommendedBufferSize)
 		for rowMessageResult := range streamIterator {
-			if rowMessageResult.Error != nil {
-				pw.CloseWithError(fmt.Errorf("error in row message result: %s", *rowMessageResult.Error))
+			if stopped.Load() {
+				return
+			}
+			if rowMessageResult.Err != nil {
+				streamErr = fmt.Errorf("error in row message result: %w", rowMessageResult.Err)
+				pw.CloseWithError(streamErr)
 				return
 			}
 			bytes, err := marshalFunc(rowMessageResult.Row)
 			if err != nil {
+				streamErr = err
 				pw.CloseWithError(err)
 				return
 			}
@@ -177,15 +191,30 @@ func (c *Client) Append(
 
 	req.Body = pr
 
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
+	appendResp, err := func() (*AppendResponse, error) {
+		resp, err := c.httpClient.Do(req)
+		if err != nil {
+			return nil, err
+		}
+		defer resp.Body.Close()
 
-	responseBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
+		responseBody, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, err
+		}
+		return unmarshalFunc(responseBody)
+	}()
+
+	// The request is over. Stop the writer before its next row and unblock a write in progress, then wait for it, so
+	// streamErr is safe to read and the iterator isn't running once Append returns.
+	stopped.Store(true)
+	pr.Close()
+	<-done
+
+	// The iterator's own error explains the failure better than whatever the HTTP request saw, unless the server
+	// answered with its own error first.
+	if streamErr != nil && (appendResp == nil || appendResp.Error == nil) {
+		return nil, streamErr
 	}
-	return unmarshalFunc(responseBody)
+	return appendResp, err
 }

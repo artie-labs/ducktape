@@ -52,8 +52,9 @@ type RowMessage struct {
 }
 
 type RowMessageResult struct {
-	Row   RowMessage `json:"row"`
-	Error *string    `json:"error"`
+	Row RowMessage `json:"row"`
+	// Err stops the append. Append returns it wrapped, so callers can match it with errors.Is or errors.As.
+	Err error `json:"-"`
 }
 
 type AppendResponse struct {
