@@ -10,6 +10,7 @@ import (
 	"iter"
 	"net"
 	"net/http"
+	"sync/atomic"
 
 	"golang.org/x/net/http2"
 )
@@ -123,6 +124,8 @@ func (c *Client) Query(
 	return unmarshalFunc(responseBody)
 }
 
+// Append streams rows from streamIterator to the server. It doesn't return while streamIterator is still running,
+// unless ctx ends first, so an iterator that can block should stop blocking when ctx ends.
 func (c *Client) Append(
 	ctx context.Context,
 	connectionString string,
@@ -149,11 +152,16 @@ func (c *Client) Append(
 
 	// streamErr is an error from the iterator or from marshalling a row. It's only read after done is closed.
 	var streamErr error
+	// stopped tells the writer the request is over, so it stops pulling rows instead of filling its buffer first.
+	var stopped atomic.Bool
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
 		bw := bufio.NewWriterSize(pw, RecommendedBufferSize)
 		for rowMessageResult := range streamIterator {
+			if stopped.Load() {
+				return
+			}
 			if rowMessageResult.Err != nil {
 				streamErr = fmt.Errorf("error in row message result: %w", rowMessageResult.Err)
 				pw.CloseWithError(streamErr)
@@ -183,14 +191,20 @@ func (c *Client) Append(
 
 	req.Body = pr
 
-	var responseBody []byte
+	var appendResp *AppendResponse
 	resp, err := c.httpClient.Do(req)
 	if err == nil {
+		var responseBody []byte
 		responseBody, err = io.ReadAll(resp.Body)
 		resp.Body.Close()
+		if err == nil {
+			appendResp, err = unmarshalFunc(responseBody)
+		}
 	}
 
-	// Unblock the writer if the request ended before it sent every row, then wait for it so streamErr is safe to read.
+	// The request is over. Stop the writer before its next row and unblock a write in progress, then wait for it, so
+	// streamErr is safe to read and the iterator isn't running once Append returns.
+	stopped.Store(true)
 	pr.Close()
 	select {
 	case <-done:
@@ -204,12 +218,13 @@ func (c *Client) Append(
 		}
 	}
 
-	// The iterator's own error explains the failure better than whatever the HTTP request saw.
+	if appendResp != nil && appendResp.Error != nil {
+		// The server answered with its own error, which came before anything the writer hit afterwards.
+		return appendResp, nil
+	}
+	// Otherwise the iterator's own error explains the failure better than whatever the HTTP request saw.
 	if streamErr != nil {
 		return nil, streamErr
 	}
-	if err != nil {
-		return nil, err
-	}
-	return unmarshalFunc(responseBody)
+	return appendResp, err
 }
