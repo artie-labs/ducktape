@@ -1,6 +1,6 @@
 module github.com/artie-labs/ducktape
 
-go 1.27.1
+go 1.27.3
 
 require (
 	github.com/artie-labs/ducktape/api v0.0.0
