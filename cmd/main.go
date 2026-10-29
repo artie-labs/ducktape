@@ -22,6 +22,9 @@ import (
 const (
 	defaultDrainDelay = 10 * time.Second
 	shutdownTimeout   = 5 * time.Minute
+	// No ReadTimeout/WriteTimeout: append requests are long-lived streams.
+	readHeaderTimeout = 10 * time.Second
+	idleTimeout       = 2 * time.Minute
 )
 
 func main() {
@@ -71,12 +74,15 @@ func main() {
 		MaxReadFrameSize:             ducktape.RecommendedBufferSize,
 		MaxUploadBufferPerConnection: ducktape.RecommendedBufferSize * 16, // 16 MB connection window
 		MaxUploadBufferPerStream:     ducktape.RecommendedBufferSize * 4,  // 4 MB per stream
+		IdleTimeout:                  idleTimeout,
 	})
 
 	api.SetDraining(false)
 	server := &http.Server{
-		Addr:    "0.0.0.0:" + port,
-		Handler: h2cHandler,
+		Addr:              "0.0.0.0:" + port,
+		Handler:           h2cHandler,
+		ReadHeaderTimeout: readHeaderTimeout,
+		IdleTimeout:       idleTimeout,
 	}
 
 	serverErrCh := make(chan error, 1)

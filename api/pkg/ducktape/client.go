@@ -11,6 +11,7 @@ import (
 	"net"
 	"net/http"
 	"sync/atomic"
+	"time"
 
 	"golang.org/x/net/http2"
 )
@@ -23,6 +24,9 @@ type Client struct {
 func NewClient(baseURL string) *Client {
 	tr := &http2.Transport{
 		AllowHTTP: true,
+		// Below the server's 2m idle timeout, so the client closes idle connections
+		// first and an Append (non-retryable pipe body) doesn't race the server's idle GOAWAY.
+		IdleConnTimeout: 90 * time.Second,
 		DialTLSContext: func(ctx context.Context, network, addr string, cfg *tls.Config) (net.Conn, error) {
 			var d net.Dialer
 			return d.DialContext(ctx, network, addr)

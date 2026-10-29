@@ -25,7 +25,7 @@ build:
 		-v /var/run/docker.sock:/var/run/docker.sock \
 		-w /go/src/github.com/artie-labs/ducktape \
 		-e CGO_ENABLED=1 \
-		goreleaser/goreleaser-cross:latest build --clean
+		goreleaser/goreleaser-cross:v1.27.3 build --clean
 
 .PHONY: build-images
 build-images:
@@ -34,7 +34,7 @@ build-images:
 		-v /var/run/docker.sock:/var/run/docker.sock \
 		-w /go/src/github.com/artie-labs/ducktape \
 		-e CGO_ENABLED=1 \
-		goreleaser/goreleaser-cross:latest release --snapshot --clean
+		goreleaser/goreleaser-cross:v1.27.3 release --snapshot --clean
 	@echo "Docker images built successfully!"
 	@echo "Available images:"
 	@docker images | grep ducktape | head -10
@@ -48,7 +48,7 @@ release:
 		-w /go/src/github.com/artie-labs/ducktape \
 		-e CGO_ENABLED=1 \
 		-e GITHUB_TOKEN \
-		goreleaser/goreleaser-cross:latest release --clean
+		goreleaser/goreleaser-cross:v1.27.3 release --clean
 	@echo ""
 	@echo "Pushing Docker images..."
 	@TAG=$$(git describe --tags --abbrev=0 2>/dev/null || echo "latest"); \
