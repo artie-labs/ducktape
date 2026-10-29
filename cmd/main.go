@@ -23,9 +23,8 @@ const (
 	defaultDrainDelay = 10 * time.Second
 	shutdownTimeout   = 5 * time.Minute
 	// No ReadTimeout/WriteTimeout: append requests are long-lived streams.
-	readHeaderTimeout    = 10 * time.Second
-	idleTimeout          = 2 * time.Minute
-	maxConcurrentStreams = 250
+	readHeaderTimeout = 10 * time.Second
+	idleTimeout       = 2 * time.Minute
 )
 
 func main() {
@@ -75,7 +74,6 @@ func main() {
 		MaxReadFrameSize:             ducktape.RecommendedBufferSize,
 		MaxUploadBufferPerConnection: ducktape.RecommendedBufferSize * 16, // 16 MB connection window
 		MaxUploadBufferPerStream:     ducktape.RecommendedBufferSize * 4,  // 4 MB per stream
-		MaxConcurrentStreams:         maxConcurrentStreams,
 		IdleTimeout:                  idleTimeout,
 	})
 
