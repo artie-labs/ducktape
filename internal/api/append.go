@@ -2,9 +2,11 @@ package api
 
 import (
 	"bufio"
+	"bytes"
 	"cmp"
 	"context"
 	"database/sql/driver"
+	stdjson "encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -12,6 +14,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/artie-labs/ducktape/api/pkg/ducktape"
@@ -163,6 +166,9 @@ func Append(ctx context.Context, dsn string, database string, schema string, tab
 	scanner.Buffer(buf, maxScannerBuffer)
 	var bytesSinceFlush uint64
 
+	var exactReader bytes.Reader
+	exactDecoder := json.NewDecoder(&exactReader)
+	exactDecoder.UseNumber()
 	for scanner.Scan() {
 		line := scanner.Bytes()
 		if len(line) == 0 {
@@ -174,7 +180,24 @@ func Append(ctx context.Context, dsn string, database string, schema string, tab
 		bytesSinceFlush += lineBytes
 
 		var rowMsg ducktape.RowMessage
-		if err := json.Unmarshal(line, &rowMsg); err != nil {
+		if appendMayNeedExactNumbers(line) {
+			// Some backends accept invalid tokens with UseNumber. Validate the
+			// complete line before decoding original integer tokens.
+			if !stdjson.Valid(line) {
+				return 0, 0, fmt.Errorf("failed to unmarshal row message for database %s, schema %s, table %s: invalid JSON", database, schema, table)
+			}
+			exactReader.Reset(line)
+			if err := exactDecoder.Decode(&rowMsg); err != nil {
+				return 0, 0, fmt.Errorf("failed to unmarshal row message for database %s, schema %s, table %s: %w", database, schema, table, err)
+			}
+			for i, value := range rowMsg.Values {
+				value, err = normalizeAppendNumbers(value)
+				if err != nil {
+					return 0, 0, fmt.Errorf("failed to unmarshal row message for database %s, schema %s, table %s: failed to convert numeric value at index %d: %w", database, schema, table, i, err)
+				}
+				rowMsg.Values[i] = value
+			}
+		} else if err := json.Unmarshal(line, &rowMsg); err != nil {
 			return 0, 0, fmt.Errorf("failed to unmarshal row message for database %s, schema %s, table %s: %w", database, schema, table, err)
 		}
 
@@ -223,3 +246,87 @@ func Append(ctx context.Context, dsn string, database string, schema string, tab
 
 	return rowsAppended, bytesRead, nil
 }
+
+// Begin append value helpers.
+
+// appendMayNeedExactNumbers avoids exact-decode allocations for ordinary rows.
+// Every integer outside float64's exact range has at least 16 decimal digits.
+// Skip strings using byte search so large text payloads do not require a scalar
+// visit per byte. Backslash parity distinguishes escaped quotes from string ends.
+// This selects a decoder only; that decoder must still validate the whole line.
+func appendMayNeedExactNumbers(line []byte) bool {
+	digits := 0
+	for i := 0; i < len(line); i++ {
+		c := line[i]
+		if c == '"' {
+			digits = 0
+			next := bytes.IndexByte(line[i+1:], '"')
+			if next < 0 {
+				// Unmarshal will reject an unterminated string.
+				return false
+			}
+			end := i + 1 + next
+			slashes := 0
+			for j := end - 1; j > i && line[j] == '\\'; j-- {
+				slashes++
+			}
+			i = end
+			if slashes%2 != 0 {
+				// Escape-dense text is cheaper to walk than to search per quote.
+				for i++; i < len(line); i++ {
+					if line[i] == '\\' {
+						i++ // Skip the escaped byte, including an escaped backslash.
+					} else if line[i] == '"' {
+						break
+					}
+				}
+			}
+		} else if c >= '0' && c <= '9' {
+			digits++
+			if digits == 16 {
+				return true
+			}
+		} else {
+			digits = 0
+		}
+	}
+	return false
+}
+
+// normalizeAppendNumbers keeps integer tokens exact while supplying concrete
+// numeric types accepted by the appender, including inside lists and structs.
+func normalizeAppendNumbers(value any) (any, error) {
+	switch v := value.(type) {
+	case stdjson.Number:
+		// Preserve the sign of floating-point zero. Fractional/exponent forms and
+		// integers outside 64-bit ranges retain the existing float64 conversion.
+		if v.String() != "-0" && !strings.ContainsAny(v.String(), ".eE") {
+			if n, err := v.Int64(); err == nil {
+				return n, nil
+			}
+			if n, err := strconv.ParseUint(v.String(), 10, 64); err == nil {
+				return n, nil
+			}
+		}
+		return v.Float64()
+	case []any:
+		for i, child := range v {
+			converted, err := normalizeAppendNumbers(child)
+			if err != nil {
+				return nil, err
+			}
+			v[i] = converted
+		}
+	case map[string]any:
+		for key, child := range v {
+			converted, err := normalizeAppendNumbers(child)
+			if err != nil {
+				return nil, err
+			}
+			v[key] = converted
+		}
+	}
+	return value, nil
+}
+
+// End append value helpers.
