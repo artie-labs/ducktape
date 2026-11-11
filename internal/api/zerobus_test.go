@@ -2,8 +2,14 @@ package api
 
 import (
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/artie-labs/ducktape/api/pkg/ducktape"
+	"golang.org/x/net/http2"
+	"golang.org/x/net/http2/h2c"
 )
 
 // collectBatches runs ingestLines over input and returns the batches it ingested.
@@ -121,6 +127,34 @@ func TestIngestLines(t *testing.T) {
 			t.Fatalf("expected the error to name DUCKTAPE_SCANNER_BUFFER, got %v", err)
 		}
 		maxScannerBuffer = prev
+	}
+}
+
+func TestHandleZerobusAppendMissingHeader(t *testing.T) {
+	mux := http.NewServeMux()
+	RegisterApiRoutes(mux)
+	server := httptest.NewServer(h2c.NewHandler(mux, &http2.Server{}))
+	t.Cleanup(server.Close)
+
+	target := ducktape.ZerobusTarget{
+		Endpoint:     "https://zerobus.example.com",
+		WorkspaceURL: "https://workspace.example.com",
+		ClientID:     "id",
+		ClientSecret: "secret",
+	}
+	rows := func(yield func([]byte, error) bool) {}
+	resp, err := ducktape.NewClient(server.URL).AppendZerobus(t.Context(), target, rows, func(b []byte) (*ducktape.AppendResponse, error) {
+		var resp ducktape.AppendResponse
+		return &resp, json.Unmarshal(b, &resp)
+	})
+	if err != nil {
+		t.Fatalf("unexpected client error: %v", err)
+	}
+	if resp.Error == nil {
+		t.Fatal("expected the server to reject the request")
+	}
+	if !strings.Contains(*resp.Error, ducktape.ZerobusTableHeader) {
+		t.Fatalf("expected the error to name the missing table header, got %q", *resp.Error)
 	}
 }
 
