@@ -123,3 +123,39 @@ func TestIngestLines(t *testing.T) {
 		maxScannerBuffer = prev
 	}
 }
+
+func TestCheckDatabricksURL(t *testing.T) {
+	{
+		// Workspace and Zerobus URLs on Databricks domains pass.
+		for _, raw := range []string{
+			"https://dbc-5c81740c-483b.cloud.databricks.com",
+			"https://4379012206025330.zerobus.us-east-1.cloud.databricks.com",
+			"https://adb-123.4.azuredatabricks.net",
+			"https://DBC-1.Cloud.Databricks.com:443",
+		} {
+			if err := checkDatabricksURL(raw); err != nil {
+				t.Fatalf("expected %q to pass, got %v", raw, err)
+			}
+		}
+	}
+	{
+		// Plain http is refused.
+		if err := checkDatabricksURL("http://dbc-1.cloud.databricks.com"); err == nil {
+			t.Fatal("expected http to be refused")
+		}
+	}
+	{
+		// Other hosts are refused, including ones that only contain a Databricks domain.
+		for _, raw := range []string{
+			"https://example.com",
+			"https://databricks.com.evil.example",
+			"https://evildatabricks.com",
+			"https://127.0.0.1",
+			"not a url",
+		} {
+			if err := checkDatabricksURL(raw); err == nil {
+				t.Fatalf("expected %q to be refused", raw)
+			}
+		}
+	}
+}

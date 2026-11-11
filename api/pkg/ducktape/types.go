@@ -6,10 +6,23 @@ const (
 	AppendRoute  = "/api/append"
 	PingRoute    = "/api/ping"
 
+	// ZerobusAppendRoute streams NDJSON rows into a Databricks Delta table through Zerobus Ingest. Each line is one
+	// JSON object keyed by column name.
+	ZerobusAppendRoute = "/api/zerobus/append"
+
 	DuckDBConnectionStringHeader = "X-DuckDB-Connection-String"
 	DuckDBDatabaseHeader         = "X-DuckDB-Database"
 	DuckDBSchemaHeader           = "X-DuckDB-Schema"
 	DuckDBTableHeader            = "X-DuckDB-Table"
+
+	// ZerobusEndpointHeader is the workspace's Zerobus endpoint, such as https://<id>.zerobus.<region>.cloud.databricks.com.
+	ZerobusEndpointHeader = "X-Zerobus-Endpoint"
+	// ZerobusWorkspaceURLHeader is the workspace URL, used to get OAuth tokens.
+	ZerobusWorkspaceURLHeader = "X-Zerobus-Workspace-URL"
+	// ZerobusTableHeader is the target table as catalog.schema.table.
+	ZerobusTableHeader        = "X-Zerobus-Table"
+	ZerobusClientIDHeader     = "X-Zerobus-Client-ID"
+	ZerobusClientSecretHeader = "X-Zerobus-Client-Secret"
 
 	// RecommendedBufferSize is the recommended buffer size for streaming appends.
 	RecommendedBufferSize = 1 << 20 // 1 MB
