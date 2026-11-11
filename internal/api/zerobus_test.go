@@ -82,6 +82,29 @@ func TestIngestLines(t *testing.T) {
 		zerobusBatchBytes = prev
 	}
 	{
+		// A row that would push a batch over the byte cap starts a new batch, so no batch goes over the cap, and a row
+		// larger than the cap goes alone.
+		prev := zerobusBatchBytes
+		zerobusBatchBytes = 15
+		// Restores it if a check fails and the reset at the end of the case is skipped.
+		t.Cleanup(func() { zerobusBatchBytes = prev })
+
+		batches, rows, _, err := collectBatches(t, "{\"a\":123}\n{\"a\":456}\n{\"a\":\"0123456789\"}\n{}\n")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if rows != 4 {
+			t.Fatalf("expected 4 rows, got %d", rows)
+		}
+		if len(batches) != 4 {
+			t.Fatalf("expected 4 batches, got %d: %v", len(batches), batches)
+		}
+		if batches[2][0] != `{"a":"0123456789"}` {
+			t.Fatalf("expected the oversized row alone in the third batch, got %v", batches[2])
+		}
+		zerobusBatchBytes = prev
+	}
+	{
 		// An ingest error stops the read and comes back.
 		boom := errors.New("boom")
 		_, _, err := ingestLines(strings.NewReader("{}\n"), func([]any) error { return boom })
@@ -132,5 +155,41 @@ func TestHandleZerobusAppendMissingHeader(t *testing.T) {
 	}
 	if !strings.Contains(*resp.Error, ducktape.ZerobusTableHeader) {
 		t.Fatalf("expected the error to name the missing table header, got %q", *resp.Error)
+	}
+}
+
+func TestCheckDatabricksURL(t *testing.T) {
+	{
+		// Workspace and Zerobus URLs on Databricks domains pass.
+		for _, raw := range []string{
+			"https://dbc-5c81740c-483b.cloud.databricks.com",
+			"https://4379012206025330.zerobus.us-east-1.cloud.databricks.com",
+			"https://adb-123.4.azuredatabricks.net",
+			"https://DBC-1.Cloud.Databricks.com:443",
+		} {
+			if err := checkDatabricksURL(raw); err != nil {
+				t.Fatalf("expected %q to pass, got %v", raw, err)
+			}
+		}
+	}
+	{
+		// Plain http is refused.
+		if err := checkDatabricksURL("http://dbc-1.cloud.databricks.com"); err == nil {
+			t.Fatal("expected http to be refused")
+		}
+	}
+	{
+		// Other hosts are refused, including ones that only contain a Databricks domain.
+		for _, raw := range []string{
+			"https://example.com",
+			"https://databricks.com.evil.example",
+			"https://evildatabricks.com",
+			"https://127.0.0.1",
+			"not a url",
+		} {
+			if err := checkDatabricksURL(raw); err == nil {
+				t.Fatalf("expected %q to be refused", raw)
+			}
+		}
 	}
 }

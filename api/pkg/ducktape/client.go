@@ -177,8 +177,10 @@ type ZerobusTarget struct {
 }
 
 // AppendZerobus streams rows into a Databricks table through Zerobus Ingest. Each row is one JSON object keyed by
-// column name; an error from rows stops the append. It returns once Zerobus has acknowledged every row. Delivery is
-// at-least-once, so a retry after a failure can write some rows twice.
+// column name, with no newline in it; an empty row or one with a newline stops the append, as does an error from rows.
+// It returns once Zerobus has acknowledged every row. Delivery is at-least-once: a failed append may have written some
+// rows, so a retry can write them twice. A failure caused by the rows themselves, such as invalid JSON, fails the same
+// way on every retry and writes the rows before it again each time.
 func (c *Client) AppendZerobus(
 	ctx context.Context,
 	target ZerobusTarget,
@@ -192,7 +194,34 @@ func (c *Client) AppendZerobus(
 		ZerobusClientIDHeader:     target.ClientID,
 		ZerobusClientSecretHeader: target.ClientSecret,
 	}
-	return streamAppend(ctx, c, ZerobusAppendRoute, headers, rows, unmarshalFunc)
+	checked := func(yield func([]byte, error) bool) {
+		var n int
+		for row, err := range rows {
+			n++
+			if err == nil {
+				err = checkNDJSONRow(row, n)
+			}
+			if !yield(row, err) {
+				return
+			}
+			if err != nil {
+				return
+			}
+		}
+	}
+	return streamAppend(ctx, c, ZerobusAppendRoute, headers, checked, unmarshalFunc)
+}
+
+// checkNDJSONRow returns an error if row can't be sent as one NDJSON line: the server would skip an empty row and
+// split one with a newline into two broken records. n is the row's 1-based position, for the error.
+func checkNDJSONRow(row []byte, n int) error {
+	if len(row) == 0 {
+		return fmt.Errorf("row %d is empty", n)
+	}
+	if bytes.IndexByte(row, '\n') >= 0 {
+		return fmt.Errorf("row %d contains a newline", n)
+	}
+	return nil
 }
 
 // streamAppend streams rows to route as NDJSON, one line per row. An error from rows stops the append. It waits for

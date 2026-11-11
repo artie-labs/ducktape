@@ -171,4 +171,23 @@ func TestAppendZerobus(t *testing.T) {
 			t.Fatalf("expected the rows' stopError, got %v", err)
 		}
 	}
+	{
+		// Rows that can't be one NDJSON line stop the append before reaching the server.
+		for _, bad := range [][]byte{nil, []byte("{\"a\":\n1}")} {
+			server := newTestServer(t, readAllHandler)
+			rows := func(yield func([]byte, error) bool) {
+				if !yield([]byte(`{"a":1}`), nil) {
+					return
+				}
+				yield(bad, nil)
+			}
+			_, err := NewClient(server.URL).AppendZerobus(t.Context(), ZerobusTarget{}, rows, func(b []byte) (*AppendResponse, error) {
+				var resp AppendResponse
+				return &resp, json.Unmarshal(b, &resp)
+			})
+			if err == nil {
+				t.Fatalf("expected row %q to be rejected", bad)
+			}
+		}
+	}
 }

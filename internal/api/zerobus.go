@@ -8,6 +8,8 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
+	"strings"
 	"time"
 
 	"github.com/artie-labs/ducktape/api/pkg/ducktape"
@@ -22,11 +24,34 @@ var (
 	// Tunable via DUCKTAPE_ZEROBUS_BATCH_BYTES.
 	zerobusBatchBytes = envIntDefault("DUCKTAPE_ZEROBUS_BATCH_BYTES", 4*1024*1024)
 
-	// zerobusFlushTimeoutMs caps how long a flush waits for Zerobus to acknowledge rows. The SDK can't be cancelled,
-	// so this also bounds how long a request whose client went away keeps running. The SDK default is 5 minutes.
-	// Tunable via DUCKTAPE_ZEROBUS_FLUSH_TIMEOUT_MS.
+	// zerobusFlushTimeoutMs caps how long a flush waits for Zerobus to acknowledge rows. The SDK default is 5 minutes.
+	// Tunable via DUCKTAPE_ZEROBUS_FLUSH_TIMEOUT_MS. The SDK can't be cancelled, and closing a stream flushes again, so a
+	// request whose client went away can keep running for up to two flushes; an ingest call blocked on Zerobus has no
+	// bound of its own.
 	zerobusFlushTimeoutMs = envIntDefault("DUCKTAPE_ZEROBUS_FLUSH_TIMEOUT_MS", 60_000)
 )
+
+// databricksDomains are the domains a Zerobus endpoint or workspace URL may be on. The route sends the client secret to
+// these hosts, so it refuses any other.
+var databricksDomains = []string{".databricks.com", ".azuredatabricks.net", ".databricks.us"}
+
+// checkDatabricksURL returns an error unless raw is an https URL on a Databricks domain.
+func checkDatabricksURL(raw string) error {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return fmt.Errorf("invalid URL %q: %w", raw, err)
+	}
+	if u.Scheme != "https" {
+		return fmt.Errorf("URL %q must use https", raw)
+	}
+	host := strings.ToLower(u.Hostname())
+	for _, domain := range databricksDomains {
+		if strings.HasSuffix(host, domain) {
+			return nil
+		}
+	}
+	return fmt.Errorf("URL %q is not on a Databricks domain (%s)", raw, strings.Join(databricksDomains, ", "))
+}
 
 type zerobusTarget struct {
 	endpoint     string
@@ -68,6 +93,14 @@ func handleZerobusAppend(w http.ResponseWriter, r *http.Request) {
 		clientSecret: r.Header.Get(ducktape.ZerobusClientSecretHeader),
 	}
 
+	for _, raw := range []string{target.endpoint, target.workspaceURL} {
+		if err := checkDatabricksURL(raw); err != nil {
+			errMsg := err.Error()
+			handleBadRequestJSON(w, ducktape.AppendResponse{Error: &errMsg}, err)
+			return
+		}
+	}
+
 	rowsAppended, bytesRead, err := ZerobusAppend(r.Context(), target, r.Body)
 	if err != nil {
 		errMsg := err.Error()
@@ -107,7 +140,11 @@ func ZerobusAppend(ctx context.Context, target zerobusTarget, input io.Reader) (
 	}
 	// Close flushes too: after the explicit Flush below it has nothing left, and on an error path it still writes the
 	// batches already queued, which at-least-once delivery allows.
-	defer stream.Close()
+	defer func() {
+		if err := stream.Close(); err != nil {
+			slog.Warn(fmt.Sprintf("failed to close the zerobus stream for table %s", target.table), slog.Any("err", err))
+		}
+	}()
 
 	rowsAppended, bytesRead, err = ingestLines(input, func(batch []any) error {
 		if err := ctx.Err(); err != nil {
@@ -130,7 +167,8 @@ func ZerobusAppend(ctx context.Context, target zerobusTarget, input io.Reader) (
 }
 
 // ingestLines reads NDJSON lines from input and passes them to ingest as strings, in batches capped by
-// zerobusBatchRows and zerobusBatchBytes. Empty lines are skipped.
+// zerobusBatchRows and zerobusBatchBytes. A row larger than the byte cap goes in a batch of its own. Empty lines are
+// skipped.
 func ingestLines(input io.Reader, ingest func(batch []any) error) (rows int64, bytesRead uint64, err error) {
 	scanner := bufio.NewScanner(input)
 	scanner.Buffer(make([]byte, 0, min(64*1024, maxScannerBuffer)), maxScannerBuffer)
@@ -141,6 +179,17 @@ func ingestLines(input io.Reader, ingest func(batch []any) error) (rows int64, b
 		line := scanner.Bytes()
 		if len(line) == 0 {
 			continue
+		}
+
+		// Send the batch first if this row would push it over the byte cap, so a batch never exceeds the cap by a row.
+		if len(batch) > 0 {
+			if batchBytes+len(line) > zerobusBatchBytes {
+				if err := ingest(batch); err != nil {
+					return 0, 0, err
+				}
+				batch = nil
+				batchBytes = 0
+			}
 		}
 
 		batch = append(batch, string(line))
