@@ -47,6 +47,8 @@ func TestIngestLines(t *testing.T) {
 		// The row cap splits batches.
 		prev := zerobusBatchRows
 		zerobusBatchRows = 2
+		// Restores it if a check fails and the reset at the end of the case is skipped.
+		t.Cleanup(func() { zerobusBatchRows = prev })
 
 		batches, rows, _, err := collectBatches(t, "{}\n{}\n{}\n{}\n{}\n")
 		if err != nil {
@@ -67,6 +69,8 @@ func TestIngestLines(t *testing.T) {
 		// The byte cap splits batches too.
 		prev := zerobusBatchBytes
 		zerobusBatchBytes = 9
+		// Restores it if a check fails and the reset at the end of the case is skipped.
+		t.Cleanup(func() { zerobusBatchBytes = prev })
 
 		batches, _, _, err := collectBatches(t, "{\"a\":123}\n{\"a\":456}\n")
 		if err != nil {
@@ -89,6 +93,8 @@ func TestIngestLines(t *testing.T) {
 		// A row longer than the scanner buffer says how to raise it.
 		prev := maxScannerBuffer
 		maxScannerBuffer = 8
+		// Restores it if a check fails and the reset at the end of the case is skipped.
+		t.Cleanup(func() { maxScannerBuffer = prev })
 
 		_, _, _, err := collectBatches(t, "{\"a\":\"too long\"}\n")
 		if err == nil {
