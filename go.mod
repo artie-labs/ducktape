@@ -4,6 +4,7 @@ go 1.27.3
 
 require (
 	github.com/artie-labs/ducktape/api v0.0.0
+	github.com/databricks/zerobus-sdk/go v1.8.0
 	github.com/duckdb/duckdb-go/v2 v2.10505.0
 	github.com/json-iterator/go v1.1.12
 	golang.org/x/net v0.62.0

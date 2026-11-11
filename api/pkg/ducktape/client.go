@@ -140,21 +140,85 @@ func (c *Client) Append(
 	marshalFunc func(r RowMessage) ([]byte, error),
 	unmarshalFunc func(r []byte) (*AppendResponse, error),
 ) (*AppendResponse, error) {
-	url := fmt.Sprintf("%s%s", c.baseURL, AppendRoute)
+	headers := map[string]string{
+		DuckDBConnectionStringHeader: connectionString,
+		DuckDBDatabaseHeader:         database,
+		DuckDBSchemaHeader:           schema,
+		DuckDBTableHeader:            table,
+	}
+	encoded := func(yield func([]byte, error) bool) {
+		for result := range streamIterator {
+			if result.Err != nil {
+				yield(nil, fmt.Errorf("error in row message result: %w", result.Err))
+				return
+			}
+			bytes, err := marshalFunc(result.Row)
+			if !yield(bytes, err) {
+				return
+			}
+			if err != nil {
+				return
+			}
+		}
+	}
+	return streamAppend(ctx, c, AppendRoute, headers, encoded, unmarshalFunc)
+}
+
+// ZerobusTarget is the Databricks table a Zerobus append writes to, and the service principal it writes as.
+type ZerobusTarget struct {
+	// Endpoint is the workspace's Zerobus endpoint, such as https://<id>.zerobus.<region>.cloud.databricks.com.
+	Endpoint string
+	// WorkspaceURL is the workspace URL, used to get OAuth tokens.
+	WorkspaceURL string
+	// Table is catalog.schema.table.
+	Table        string
+	ClientID     string
+	ClientSecret string
+}
+
+// AppendZerobus streams rows into a Databricks table through Zerobus Ingest. Each row is one JSON object keyed by
+// column name; an error from rows stops the append. It returns once Zerobus has acknowledged every row. Delivery is
+// at-least-once, so a retry after a failure can write some rows twice.
+func (c *Client) AppendZerobus(
+	ctx context.Context,
+	target ZerobusTarget,
+	rows iter.Seq2[[]byte, error],
+	unmarshalFunc func(r []byte) (*AppendResponse, error),
+) (*AppendResponse, error) {
+	headers := map[string]string{
+		ZerobusEndpointHeader:     target.Endpoint,
+		ZerobusWorkspaceURLHeader: target.WorkspaceURL,
+		ZerobusTableHeader:        target.Table,
+		ZerobusClientIDHeader:     target.ClientID,
+		ZerobusClientSecretHeader: target.ClientSecret,
+	}
+	return streamAppend(ctx, c, ZerobusAppendRoute, headers, rows, unmarshalFunc)
+}
+
+// streamAppend streams rows to route as NDJSON, one line per row. An error from rows stops the append. It waits for
+// rows to return, so the iterator shouldn't block.
+func streamAppend(
+	ctx context.Context,
+	c *Client,
+	route string,
+	headers map[string]string,
+	rows iter.Seq2[[]byte, error],
+	unmarshalFunc func(r []byte) (*AppendResponse, error),
+) (*AppendResponse, error) {
+	url := fmt.Sprintf("%s%s", c.baseURL, route)
 	req, err := http.NewRequestWithContext(ctx, "POST", url, nil)
 	if err != nil {
 		return nil, err
 	}
 
 	req.Header.Set("Content-Type", "application/octet-stream")
-	req.Header.Set(DuckDBConnectionStringHeader, connectionString)
-	req.Header.Set(DuckDBDatabaseHeader, database)
-	req.Header.Set(DuckDBSchemaHeader, schema)
-	req.Header.Set(DuckDBTableHeader, table)
+	for key, value := range headers {
+		req.Header.Set(key, value)
+	}
 
 	pr, pw := io.Pipe()
 
-	// streamErr is an error from the iterator or from marshalling a row. It's only read after done is closed.
+	// streamErr is an error from the iterator. It's only read after done is closed.
 	var streamErr error
 	// stopped tells the writer the request is over, so it stops pulling rows instead of filling its buffer first.
 	var stopped atomic.Bool
@@ -162,16 +226,10 @@ func (c *Client) Append(
 	go func() {
 		defer close(done)
 		bw := bufio.NewWriterSize(pw, RecommendedBufferSize)
-		for rowMessageResult := range streamIterator {
+		for bytes, err := range rows {
 			if stopped.Load() {
 				return
 			}
-			if rowMessageResult.Err != nil {
-				streamErr = fmt.Errorf("error in row message result: %w", rowMessageResult.Err)
-				pw.CloseWithError(streamErr)
-				return
-			}
-			bytes, err := marshalFunc(rowMessageResult.Row)
 			if err != nil {
 				streamErr = err
 				pw.CloseWithError(err)
