@@ -23,5 +23,8 @@ jobs:
     - name: Go mod tidy
       run: go mod tidy
 
+    - name: Strip zerobus bitcode
+      run: sh scripts/strip-zerobus-lto.sh
+
     - name: Test
       run: make test
