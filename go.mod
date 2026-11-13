@@ -9,7 +9,7 @@ require (
 	github.com/duckdb/duckdb-go/v2 v2.10505.0
 	github.com/json-iterator/go v1.1.12
 	golang.org/x/net v0.62.0
-	golang.org/x/sync v0.24.0
+	golang.org/x/sync v0.25.0
 )
 
 replace github.com/artie-labs/ducktape/api => ./api
