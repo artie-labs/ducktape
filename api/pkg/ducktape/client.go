@@ -176,39 +176,10 @@ type ZerobusTarget struct {
 	ClientSecret string
 }
 
-// AppendZerobus streams rows into a Databricks table through Zerobus Ingest. Each row is one JSON object keyed by
-// column name, with no newline in it; an empty row or one with a newline stops the append, as does an error from rows.
-// It returns once Zerobus has acknowledged every row. Delivery is at-least-once: a failed append may have written some
-// rows, so a retry can write them twice. A failure caused by the rows themselves, such as invalid JSON, fails the same
-// way on every retry and writes the rows before it again each time.
-func (c *Client) AppendZerobus(
-	ctx context.Context,
-	target ZerobusTarget,
-	rows iter.Seq2[[]byte, error],
-	unmarshalFunc func(r []byte) (*AppendResponse, error),
-) (*AppendResponse, error) {
-	checked := func(yield func([]byte, error) bool) {
-		var n int
-		for row, err := range rows {
-			n++
-			if err == nil {
-				err = checkNDJSONRow(row, n)
-			}
-			if !yield(row, err) {
-				return
-			}
-			if err != nil {
-				return
-			}
-		}
-	}
-	return streamAppend(ctx, c, ZerobusAppendRoute, target.headers(), checked, true, unmarshalFunc)
-}
-
 // AppendZerobusArrow streams an Arrow IPC stream into a Databricks table through Zerobus's Arrow Flight path. chunks
 // are written back to back and must form one IPC stream: a schema matching the table's columns, then record batches.
 // Ducktape sends the batches to Zerobus with zstd compression. It returns once Zerobus has acknowledged every row, and
-// delivery is at-least-once, like AppendZerobus.
+// delivery is at-least-once: a failed append may have written some rows, so a retry can write them twice.
 func (c *Client) AppendZerobusArrow(
 	ctx context.Context,
 	target ZerobusTarget,
@@ -226,18 +197,6 @@ func (t ZerobusTarget) headers() map[string]string {
 		ZerobusClientIDHeader:     t.ClientID,
 		ZerobusClientSecretHeader: t.ClientSecret,
 	}
-}
-
-// checkNDJSONRow returns an error if row can't be sent as one NDJSON line: the server would skip an empty row and
-// split one with a newline into two broken records. n is the row's 1-based position, for the error.
-func checkNDJSONRow(row []byte, n int) error {
-	if len(row) == 0 {
-		return fmt.Errorf("row %d is empty", n)
-	}
-	if bytes.IndexByte(row, '\n') >= 0 {
-		return fmt.Errorf("row %d contains a newline", n)
-	}
-	return nil
 }
 
 // streamAppend streams rows to route back to back, with a newline after each one when newline is set (NDJSON). An

@@ -6,10 +6,6 @@ const (
 	AppendRoute  = "/api/append"
 	PingRoute    = "/api/ping"
 
-	// ZerobusAppendRoute streams NDJSON rows into a Databricks Delta table through Zerobus Ingest. Each line is one
-	// JSON object keyed by column name.
-	ZerobusAppendRoute = "/api/zerobus/append"
-
 	// ZerobusAppendArrowRoute streams an Arrow IPC stream (a schema, then record batches) into a Databricks Delta
 	// table through Zerobus's Arrow Flight path. The schema's field names and types must match the table's.
 	ZerobusAppendArrowRoute = "/api/zerobus/append-arrow"
