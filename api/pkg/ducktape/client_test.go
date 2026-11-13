@@ -191,3 +191,42 @@ func TestAppendZerobus(t *testing.T) {
 		}
 	}
 }
+
+func TestAppendZerobusArrow(t *testing.T) {
+	{
+		// Chunks go out back to back, with no newline between them, to the arrow route.
+		var gotPath, gotTable, gotBody string
+		server := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+			gotPath = r.URL.Path
+			gotTable = r.Header.Get(ZerobusTableHeader)
+			body, _ := io.ReadAll(r.Body)
+			gotBody = string(body)
+			_ = json.NewEncoder(w).Encode(AppendResponse{RowsAppended: 3})
+		})
+		chunks := func(yield func([]byte, error) bool) {
+			if !yield([]byte("schema"), nil) {
+				return
+			}
+			yield([]byte("batch"), nil)
+		}
+		resp, err := NewClient(server.URL).AppendZerobusArrow(t.Context(), ZerobusTarget{Table: "c.s.t"}, chunks, func(b []byte) (*AppendResponse, error) {
+			var resp AppendResponse
+			return &resp, json.Unmarshal(b, &resp)
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if resp.RowsAppended != 3 {
+			t.Fatalf("expected 3 rows appended, got %d", resp.RowsAppended)
+		}
+		if gotPath != ZerobusAppendArrowRoute {
+			t.Fatalf("expected the arrow route, got %q", gotPath)
+		}
+		if gotTable != "c.s.t" {
+			t.Fatalf("expected the table header, got %q", gotTable)
+		}
+		if gotBody != "schemabatch" {
+			t.Fatalf("expected the chunks back to back, got %q", gotBody)
+		}
+	}
+}

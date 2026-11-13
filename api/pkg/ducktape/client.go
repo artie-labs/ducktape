@@ -161,7 +161,7 @@ func (c *Client) Append(
 			}
 		}
 	}
-	return streamAppend(ctx, c, AppendRoute, headers, encoded, unmarshalFunc)
+	return streamAppend(ctx, c, AppendRoute, headers, encoded, true, unmarshalFunc)
 }
 
 // ZerobusTarget is the Databricks table a Zerobus append writes to, and the service principal it writes as.
@@ -187,13 +187,6 @@ func (c *Client) AppendZerobus(
 	rows iter.Seq2[[]byte, error],
 	unmarshalFunc func(r []byte) (*AppendResponse, error),
 ) (*AppendResponse, error) {
-	headers := map[string]string{
-		ZerobusEndpointHeader:     target.Endpoint,
-		ZerobusWorkspaceURLHeader: target.WorkspaceURL,
-		ZerobusTableHeader:        target.Table,
-		ZerobusClientIDHeader:     target.ClientID,
-		ZerobusClientSecretHeader: target.ClientSecret,
-	}
 	checked := func(yield func([]byte, error) bool) {
 		var n int
 		for row, err := range rows {
@@ -209,7 +202,30 @@ func (c *Client) AppendZerobus(
 			}
 		}
 	}
-	return streamAppend(ctx, c, ZerobusAppendRoute, headers, checked, unmarshalFunc)
+	return streamAppend(ctx, c, ZerobusAppendRoute, target.headers(), checked, true, unmarshalFunc)
+}
+
+// AppendZerobusArrow streams an Arrow IPC stream into a Databricks table through Zerobus's Arrow Flight path. chunks
+// are written back to back and must form one IPC stream: a schema matching the table's columns, then record batches.
+// Ducktape sends the batches to Zerobus with zstd compression. It returns once Zerobus has acknowledged every row, and
+// delivery is at-least-once, like AppendZerobus.
+func (c *Client) AppendZerobusArrow(
+	ctx context.Context,
+	target ZerobusTarget,
+	chunks iter.Seq2[[]byte, error],
+	unmarshalFunc func(r []byte) (*AppendResponse, error),
+) (*AppendResponse, error) {
+	return streamAppend(ctx, c, ZerobusAppendArrowRoute, target.headers(), chunks, false, unmarshalFunc)
+}
+
+func (t ZerobusTarget) headers() map[string]string {
+	return map[string]string{
+		ZerobusEndpointHeader:     t.Endpoint,
+		ZerobusWorkspaceURLHeader: t.WorkspaceURL,
+		ZerobusTableHeader:        t.Table,
+		ZerobusClientIDHeader:     t.ClientID,
+		ZerobusClientSecretHeader: t.ClientSecret,
+	}
 }
 
 // checkNDJSONRow returns an error if row can't be sent as one NDJSON line: the server would skip an empty row and
@@ -224,14 +240,15 @@ func checkNDJSONRow(row []byte, n int) error {
 	return nil
 }
 
-// streamAppend streams rows to route as NDJSON, one line per row. An error from rows stops the append. It waits for
-// rows to return, so the iterator shouldn't block.
+// streamAppend streams rows to route back to back, with a newline after each one when newline is set (NDJSON). An
+// error from rows stops the append. It waits for rows to return, so the iterator shouldn't block.
 func streamAppend(
 	ctx context.Context,
 	c *Client,
 	route string,
 	headers map[string]string,
 	rows iter.Seq2[[]byte, error],
+	newline bool,
 	unmarshalFunc func(r []byte) (*AppendResponse, error),
 ) (*AppendResponse, error) {
 	url := fmt.Sprintf("%s%s", c.baseURL, route)
@@ -267,6 +284,9 @@ func streamAppend(
 			if _, err = bw.Write(bytes); err != nil {
 				pw.CloseWithError(err)
 				return
+			}
+			if !newline {
+				continue
 			}
 			if err = bw.WriteByte('\n'); err != nil {
 				pw.CloseWithError(err)
