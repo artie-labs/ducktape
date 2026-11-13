@@ -41,6 +41,7 @@ func RegisterApiRoutes(mux *http.ServeMux) {
 	mux.HandleFunc(fmt.Sprintf("POST %s", ducktape.QueryRoute), handleQuery)
 	mux.HandleFunc(fmt.Sprintf("POST %s", ducktape.AppendRoute), handleAppend)
 	mux.HandleFunc(fmt.Sprintf("POST %s", ducktape.ZerobusAppendRoute), handleZerobusAppend)
+	mux.HandleFunc(fmt.Sprintf("POST %s", ducktape.ZerobusAppendArrowRoute), handleZerobusAppendArrow)
 	mux.HandleFunc(fmt.Sprintf("GET %s", ducktape.PingRoute), handlePing)
 }
 

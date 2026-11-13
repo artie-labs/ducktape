@@ -63,11 +63,58 @@ type zerobusTarget struct {
 
 func handleZerobusAppend(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
+	target, ok := parseZerobusTarget(w, r)
+	if !ok {
+		return
+	}
+
+	rowsAppended, bytesRead, err := ZerobusAppend(r.Context(), target, r.Body)
+	if err != nil {
+		errMsg := err.Error()
+		handleInternalServerErrorJSON(w, ducktape.AppendResponse{Error: &errMsg}, err)
+		return
+	}
+	writeAppendResponse(w, rowsAppended)
+	slog.Info(fmt.Sprintf("zerobus append complete for table %s", target.table), slog.Int64("totalRowsAppended", rowsAppended), slog.Uint64("totalBytesRead", bytesRead), slog.Duration("elapsed", time.Since(start)))
+}
+
+func handleZerobusAppendArrow(w http.ResponseWriter, r *http.Request) {
+	start := time.Now()
+	target, ok := parseZerobusTarget(w, r)
+	if !ok {
+		return
+	}
+
+	rowsAppended, err := ZerobusAppendArrow(r.Context(), target, r.Body)
+	if err != nil {
+		errMsg := err.Error()
+		handleInternalServerErrorJSON(w, ducktape.AppendResponse{Error: &errMsg}, err)
+		return
+	}
+	writeAppendResponse(w, rowsAppended)
+	slog.Info(fmt.Sprintf("zerobus arrow append complete for table %s", target.table), slog.Int64("totalRowsAppended", rowsAppended), slog.Duration("elapsed", time.Since(start)))
+}
+
+func writeAppendResponse(w http.ResponseWriter, rowsAppended int64) {
+	body, err := json.Marshal(ducktape.AppendResponse{RowsAppended: rowsAppended})
+	if err != nil {
+		err := fmt.Errorf("failed to marshal response: %v", err)
+		errMsg := err.Error()
+		handleInternalServerErrorJSON(w, ducktape.AppendResponse{Error: &errMsg}, err)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(body)
+}
+
+// parseZerobusTarget reads and checks the X-Zerobus-* headers. On a bad request it writes the error and returns false.
+func parseZerobusTarget(w http.ResponseWriter, r *http.Request) (zerobusTarget, bool) {
 	if r.ProtoMajor != 2 {
 		err := fmt.Errorf("HTTP/2 is required, got %s", r.Proto)
 		errMsg := err.Error()
 		handleBadRequestJSON(w, ducktape.AppendResponse{Error: &errMsg}, err)
-		return
+		return zerobusTarget{}, false
 	}
 
 	for _, header := range []string{
@@ -81,7 +128,7 @@ func handleZerobusAppend(w http.ResponseWriter, r *http.Request) {
 			err := fmt.Errorf("%q header is required", header)
 			errMsg := err.Error()
 			handleBadRequestJSON(w, ducktape.AppendResponse{Error: &errMsg}, err)
-			return
+			return zerobusTarget{}, false
 		}
 	}
 
@@ -97,28 +144,10 @@ func handleZerobusAppend(w http.ResponseWriter, r *http.Request) {
 		if err := checkDatabricksURL(raw); err != nil {
 			errMsg := err.Error()
 			handleBadRequestJSON(w, ducktape.AppendResponse{Error: &errMsg}, err)
-			return
+			return zerobusTarget{}, false
 		}
 	}
-
-	rowsAppended, bytesRead, err := ZerobusAppend(r.Context(), target, r.Body)
-	if err != nil {
-		errMsg := err.Error()
-		handleInternalServerErrorJSON(w, ducktape.AppendResponse{Error: &errMsg}, err)
-		return
-	}
-
-	body, err := json.Marshal(ducktape.AppendResponse{RowsAppended: rowsAppended})
-	if err != nil {
-		err := fmt.Errorf("failed to marshal response: %v", err)
-		errMsg := err.Error()
-		handleInternalServerErrorJSON(w, ducktape.AppendResponse{Error: &errMsg}, err)
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	w.Write(body)
-	slog.Info(fmt.Sprintf("zerobus append complete for table %s", target.table), slog.Int64("totalRowsAppended", rowsAppended), slog.Uint64("totalBytesRead", bytesRead), slog.Duration("elapsed", time.Since(start)))
+	return target, true
 }
 
 // ZerobusAppend streams NDJSON rows from input into the target table and returns once Zerobus has acknowledged every
