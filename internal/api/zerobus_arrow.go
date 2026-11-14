@@ -18,7 +18,7 @@ import (
 var zerobusArrowInflightBatches = envIntDefault("DUCKTAPE_ZEROBUS_ARROW_INFLIGHT_BATCHES", 50)
 
 // ZerobusAppendArrow streams the Arrow IPC stream in input into the target table through Zerobus's Arrow Flight path,
-// zstd-compressed, and returns once Zerobus has acknowledged every row. Delivery is at-least-once, like ZerobusAppend.
+// zstd-compressed, and returns once Zerobus has acknowledged every row. Delivery is at-least-once: a failed request may have written some rows, so a retry can duplicate them.
 func ZerobusAppendArrow(ctx context.Context, target zerobusTarget, input io.Reader) (int64, error) {
 	sdk, err := zerobus.NewZerobusSdkWithOptions(target.endpoint, target.workspaceURL, zerobus.WithApplicationName("artie-ducktape"))
 	if err != nil {
