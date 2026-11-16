@@ -829,14 +829,74 @@ func TestConvertValue(t *testing.T) {
 			}
 		})
 
-		t.Run("non-string value passes through", func(t *testing.T) {
+		t.Run("numbers are scaled like strings", func(t *testing.T) {
 			metadata := ColumnMetadata{Name: "val", Type: "DECIMAL(10,2)"}
-			result, err := ConvertValue(float64(3.14), metadata)
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
+			assertUnscaled := func(in any, want int64) {
+				t.Helper()
+				result, err := ConvertValue(in, metadata)
+				if err != nil {
+					t.Fatalf("%v: unexpected error: %v", in, err)
+				}
+				d, ok := result.(duckdb.Decimal)
+				if !ok {
+					t.Fatalf("%v: expected duckdb.Decimal, got %T", in, result)
+				}
+				if !equal(d.Value, big.NewInt(want)) {
+					t.Errorf("%v: expected unscaled value %d, got %s", in, want, d.Value.String())
+				}
 			}
-			if result != float64(3.14) {
-				t.Errorf("expected 3.14, got %v", result)
+			{
+				// fractional float
+				assertUnscaled(float64(19.99), 1999)
+			}
+			{
+				// whole float
+				assertUnscaled(float64(7043955), 704395500)
+			}
+			{
+				// negative float below one
+				assertUnscaled(float64(-0.5), -50)
+			}
+			{
+				// float that %g would print in exponent form
+				assertUnscaled(float64(1e7), 1000000000)
+			}
+			{
+				// int64
+				assertUnscaled(int64(42), 4200)
+			}
+			{
+				// uint64
+				assertUnscaled(uint64(42), 4200)
+			}
+		})
+
+		t.Run("number with excess fractional digits returns error", func(t *testing.T) {
+			metadata := ColumnMetadata{Name: "val", Type: "DECIMAL(10,2)"}
+			if _, err := ConvertValue(float64(1.999), metadata); err == nil {
+				t.Error("expected error for fractional digits exceeding scale, but got none")
+			}
+		})
+
+		t.Run("value wider than column returns error", func(t *testing.T) {
+			metadata := ColumnMetadata{Name: "val", Type: "DECIMAL(4,2)"}
+			{
+				// number
+				if _, err := ConvertValue(float64(400), metadata); err == nil {
+					t.Error("expected error for 400 in DECIMAL(4,2), but got none")
+				}
+			}
+			{
+				// string
+				if _, err := ConvertValue("-400", metadata); err == nil {
+					t.Error("expected error for -400 in DECIMAL(4,2), but got none")
+				}
+			}
+			{
+				// widest value that fits
+				if _, err := ConvertValue("-99.99", metadata); err != nil {
+					t.Errorf("unexpected error for -99.99 in DECIMAL(4,2): %v", err)
+				}
 			}
 		})
 
