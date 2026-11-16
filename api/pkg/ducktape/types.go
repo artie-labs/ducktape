@@ -10,6 +10,10 @@ const (
 	// table through Zerobus's Arrow Flight path. The schema's field names and types must match the table's.
 	ZerobusAppendArrowRoute = "/api/zerobus/append-arrow"
 
+	// ZerobusCheckRoute opens a Zerobus stream for a table and closes it without writing, to check the endpoint, the
+	// service principal's secret and its access to the table.
+	ZerobusCheckRoute = "/api/zerobus/check"
+
 	DuckDBConnectionStringHeader = "X-DuckDB-Connection-String"
 	DuckDBDatabaseHeader         = "X-DuckDB-Database"
 	DuckDBSchemaHeader           = "X-DuckDB-Schema"
@@ -68,6 +72,10 @@ type RowMessageResult struct {
 	Row RowMessage `json:"row"`
 	// Err stops the append. Append returns it wrapped, so callers can match it with errors.Is or errors.As.
 	Err error `json:"-"`
+}
+
+type ZerobusCheckResponse struct {
+	Error *string `json:"error"`
 }
 
 type AppendResponse struct {

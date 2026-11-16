@@ -39,6 +39,24 @@ func TestHandleZerobusAppendArrowMissingHeader(t *testing.T) {
 	}
 }
 
+func TestHandleZerobusCheckMissingHeader(t *testing.T) {
+	mux := http.NewServeMux()
+	RegisterApiRoutes(mux)
+	server := httptest.NewServer(h2c.NewHandler(mux, &http2.Server{}))
+	t.Cleanup(server.Close)
+
+	target := ducktape.ZerobusTarget{
+		Endpoint:     "https://zerobus.example.com",
+		WorkspaceURL: "https://workspace.example.com",
+		ClientID:     "id",
+		ClientSecret: "secret",
+	}
+	err := ducktape.NewClient(server.URL).CheckZerobus(t.Context(), target)
+	if err == nil || !strings.Contains(err.Error(), ducktape.ZerobusTableHeader) {
+		t.Fatalf("expected the error to name the missing table header, got %v", err)
+	}
+}
+
 func TestCheckDatabricksURL(t *testing.T) {
 	{
 		// Workspace and Zerobus URLs on Databricks domains pass.

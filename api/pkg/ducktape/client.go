@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"io"
 	"iter"
@@ -187,6 +188,40 @@ func (c *Client) AppendZerobusArrow(
 	unmarshalFunc func(r []byte) (*AppendResponse, error),
 ) (*AppendResponse, error) {
 	return streamAppend(ctx, c, ZerobusAppendArrowRoute, target.headers(), chunks, false, unmarshalFunc)
+}
+
+// CheckZerobus opens a Zerobus stream for target's table and closes it without writing a row. It returns an error when
+// the endpoint, the client secret, the table or the service principal's access to it is wrong.
+func (c *Client) CheckZerobus(ctx context.Context, target ZerobusTarget) error {
+	req, err := http.NewRequestWithContext(ctx, "POST", c.baseURL+ZerobusCheckRoute, nil)
+	if err != nil {
+		return err
+	}
+	for key, value := range target.headers() {
+		req.Header.Set(key, value)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read the zerobus check response: %w", err)
+	}
+	var response ZerobusCheckResponse
+	if err := json.Unmarshal(body, &response); err != nil {
+		return fmt.Errorf("failed to parse the zerobus check response (%s): %w", resp.Status, err)
+	}
+	if response.Error != nil {
+		return fmt.Errorf("zerobus check failed: %s", *response.Error)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("zerobus check failed: %s", resp.Status)
+	}
+	return nil
 }
 
 func (t ZerobusTarget) headers() map[string]string {
