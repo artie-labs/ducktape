@@ -124,6 +124,45 @@ func TestAppend(t *testing.T) {
 		}
 	})
 
+	t.Run("append DECIMAL from JSON numbers and strings", func(t *testing.T) {
+		dsn := "test_append_decimal.db"
+		t.Cleanup(func() { os.Remove(dsn) })
+
+		_, err := Execute(ctx, dsn, ducktape.ExecuteRequest{
+			Statements: []ducktape.ExecuteStatement{
+				{Query: `CREATE TABLE test_append_decimal (id INTEGER, amount DECIMAL(10,2))`},
+			},
+		})
+		if err != nil {
+			t.Fatalf("failed to create table: %v", err)
+		}
+
+		ndjson := `{"rv":[1,19.99]}
+{"rv":[2,7043955]}
+{"rv":[3,"19.99"]}`
+
+		if _, _, err := Append(ctx, dsn, "test_append_decimal", "main", "test_append_decimal", strings.NewReader(ndjson)); err != nil {
+			t.Fatalf("failed to append: %v", err)
+		}
+
+		result, err := Query(ctx, dsn, ducktape.QueryRequest{
+			Query: "SELECT amount::VARCHAR AS amount FROM test_append_decimal ORDER BY id",
+		})
+		if err != nil {
+			t.Fatalf("failed to query: %v", err)
+		}
+
+		want := []string{"19.99", "7043955.00", "19.99"}
+		if len(result) != len(want) {
+			t.Fatalf("expected %d rows, got %d", len(want), len(result))
+		}
+		for i, w := range want {
+			if result[i]["amount"] != w {
+				t.Errorf("row %d: expected amount=%s, got %v", i+1, w, result[i]["amount"])
+			}
+		}
+	})
+
 	t.Run("append with empty lines", func(t *testing.T) {
 		dsn := "test_append_empty_lines.db"
 		t.Cleanup(func() { os.Remove(dsn) })

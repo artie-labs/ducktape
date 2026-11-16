@@ -187,7 +187,7 @@ func ConvertValue(value any, columnMetadata ColumnMetadata) (driver.Value, error
 	default:
 		// Handle parameterized types like DECIMAL(15,2), NUMERIC(10,0)
 		if strings.HasPrefix(metadataType, "DECIMAL") || strings.HasPrefix(metadataType, "NUMERIC") {
-			if s, ok := value.(string); ok {
+			if s, ok := decimalText(value); ok {
 				width, scale, err := parseDecimalType(metadataType)
 				if err != nil {
 					return nil, fmt.Errorf("failed to parse decimal type %q: %w", metadataType, err)
@@ -196,6 +196,11 @@ func ConvertValue(value any, columnMetadata ColumnMetadata) (driver.Value, error
 				if err != nil {
 					return nil, fmt.Errorf("failed to parse decimal value %q for column %q: %w", s, columnMetadata.Name, err)
 				}
+				// The driver truncates the unscaled value into the column's storage int, so a
+				// value wider than the column wraps (400 into DECIMAL(4,2) becomes -255.36).
+				if digits := len(new(big.Int).Abs(unscaled).String()); digits > int(width) {
+					return nil, fmt.Errorf("decimal value %q for column %q has %d digits, exceeding width %d", s, columnMetadata.Name, digits, width)
+				}
 				return duckdb.Decimal{Width: width, Scale: scale, Value: unscaled}, nil
 			}
 			return value, nil
@@ -203,6 +208,26 @@ func ConvertValue(value any, columnMetadata ColumnMetadata) (driver.Value, error
 		// For all other types (BIGINT, BOOLEAN, VARCHAR, etc.), pass through as-is
 		// The driver will handle basic conversions
 		return value, nil
+	}
+}
+
+// decimalText returns the decimal text for a DECIMAL input. Numbers must go through the
+// same text path as strings: a raw number handed to the appender is written as the
+// unscaled integer, so 19.99 into DECIMAL(10,2) would be stored as 0.19.
+// float64 holds about 17 significant digits, so wider values need string input to be exact.
+func decimalText(value any) (string, bool) {
+	switch v := value.(type) {
+	case string:
+		return v, true
+	case float64:
+		// 'f' never uses exponent notation, which parseDecimalString can't read.
+		return strconv.FormatFloat(v, 'f', -1, 64), true
+	case int64:
+		return strconv.FormatInt(v, 10), true
+	case uint64:
+		return strconv.FormatUint(v, 10), true
+	default:
+		return "", false
 	}
 }
 
