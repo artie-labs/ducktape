@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync/atomic"
 	"testing"
 
@@ -160,6 +161,53 @@ func TestAppendZerobusArrow(t *testing.T) {
 		}
 		if gotBody != "schemabatch" {
 			t.Fatalf("expected the chunks back to back, got %q", gotBody)
+		}
+	}
+}
+
+func TestCheckZerobus(t *testing.T) {
+	{
+		// The target goes in headers to the check route, with no body, and a 200 with no error passes.
+		var gotPath, gotTable, gotBody string
+		server := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+			gotPath = r.URL.Path
+			gotTable = r.Header.Get(ZerobusTableHeader)
+			body, _ := io.ReadAll(r.Body)
+			gotBody = string(body)
+			_, _ = w.Write([]byte("{}"))
+		})
+		if err := NewClient(server.URL).CheckZerobus(t.Context(), ZerobusTarget{Table: "c.s.t"}); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if gotPath != ZerobusCheckRoute {
+			t.Fatalf("expected the check route, got %q", gotPath)
+		}
+		if gotTable != "c.s.t" {
+			t.Fatalf("expected the table header, got %q", gotTable)
+		}
+		if gotBody != "" {
+			t.Fatalf("expected no body, got %q", gotBody)
+		}
+	}
+	{
+		// The server's error comes back.
+		server := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusInternalServerError)
+			_ = json.NewEncoder(w).Encode(ZerobusCheckResponse{Error: new("permission denied on table c.s.t")})
+		})
+		err := NewClient(server.URL).CheckZerobus(t.Context(), ZerobusTarget{Table: "c.s.t"})
+		if err == nil || !strings.Contains(err.Error(), "permission denied on table c.s.t") {
+			t.Fatalf("expected the server's error, got %v", err)
+		}
+	}
+	{
+		// A non-JSON failure, such as an older Ducktape without the route, fails with the status.
+		server := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+			http.NotFound(w, r)
+		})
+		err := NewClient(server.URL).CheckZerobus(t.Context(), ZerobusTarget{Table: "c.s.t"})
+		if err == nil || !strings.Contains(err.Error(), "404") {
+			t.Fatalf("expected a 404 error, got %v", err)
 		}
 	}
 }
