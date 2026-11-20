@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
+	"encoding/base64"
 	"fmt"
 	"math/big"
 	"strconv"
@@ -127,6 +128,20 @@ func ConvertValue(value any, columnMetadata ColumnMetadata) (driver.Value, error
 		}
 
 		return convertedValues, nil
+	case "BLOB":
+		// JSON carries []byte as standard base64 (what encoding/json writes), so decode it back.
+		switch v := value.(type) {
+		case []byte:
+			return v, nil
+		case string:
+			decoded, err := base64.StdEncoding.DecodeString(v)
+			if err != nil {
+				return nil, fmt.Errorf("failed to base64-decode value for BLOB column %q: %w", columnMetadata.Name, err)
+			}
+			return decoded, nil
+		default:
+			return nil, fmt.Errorf("expected base64 string for BLOB column %q, got %T", columnMetadata.Name, value)
+		}
 	case "DATE":
 		// Handle date strings (may include timestamp portion)
 		if s, ok := value.(string); ok {
