@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"math/big"
@@ -1152,6 +1153,60 @@ func BenchmarkGetColumnMetadata(b *testing.B) {
 		_, err := GetColumnMetadata(ctx, conn, "memory", "main", "bench_metadata")
 		if err != nil {
 			b.Fatalf("GetColumnMetadata failed: %v", err)
+		}
+	}
+}
+
+func TestConvertValueBlob(t *testing.T) {
+	metadata := ColumnMetadata{Name: "payload", Type: "BLOB"}
+	{
+		// Valid base64 decodes to the raw bytes
+		result, err := ConvertValue("3q0Avu8=", metadata)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !bytes.Equal(result.([]byte), []byte{0xde, 0xad, 0x00, 0xbe, 0xef}) {
+			t.Fatalf("unexpected bytes: %#v", result)
+		}
+	}
+	{
+		// Empty string decodes to empty bytes
+		result, err := ConvertValue("", metadata)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(result.([]byte)) != 0 {
+			t.Fatalf("expected empty bytes, got %#v", result)
+		}
+	}
+	{
+		// Invalid base64 returns an error naming the column
+		_, err := ConvertValue("not base64!", metadata)
+		if err == nil {
+			t.Fatal("expected error but got none")
+		}
+		if !strings.Contains(err.Error(), `"payload"`) {
+			t.Fatalf("error should name the column, got: %v", err)
+		}
+	}
+	{
+		// Nil passes through
+		result, err := ConvertValue(nil, metadata)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if result != nil {
+			t.Fatalf("expected nil, got %#v", result)
+		}
+	}
+	{
+		// Existing []byte passes through untouched
+		result, err := ConvertValue([]byte("aGk="), metadata)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !bytes.Equal(result.([]byte), []byte("aGk=")) {
+			t.Fatalf("unexpected bytes: %#v", result)
 		}
 	}
 }
