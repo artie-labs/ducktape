@@ -915,6 +915,122 @@ func TestConvertValue(t *testing.T) {
 				t.Error("expected error but got none")
 			}
 		})
+
+		t.Run("strings without digits return error", func(t *testing.T) {
+			metadata := ColumnMetadata{Name: "val", Type: "DECIMAL(10,2)"}
+			for _, in := range []string{"", " ", ".", "-", "+", "-."} {
+				if _, err := ConvertValue(in, metadata); err == nil {
+					t.Errorf("expected error for %q, but got none", in)
+				}
+			}
+		})
+
+		t.Run("leading or trailing dot is allowed", func(t *testing.T) {
+			metadata := ColumnMetadata{Name: "val", Type: "DECIMAL(10,2)"}
+			for in, want := range map[string]int64{".5": 50, "-.5": -50, "5.": 500} {
+				result, err := ConvertValue(in, metadata)
+				if err != nil {
+					t.Fatalf("%q: unexpected error: %v", in, err)
+				}
+				if d := result.(duckdb.Decimal); !equal(d.Value, big.NewInt(want)) {
+					t.Errorf("%q: expected unscaled value %d, got %s", in, want, d.Value.String())
+				}
+			}
+		})
+	})
+
+	t.Run("DECIMAL array conversions", func(t *testing.T) {
+		assertUnscaledArray := func(t *testing.T, result any, want []any) {
+			t.Helper()
+			values, ok := result.([]any)
+			if !ok {
+				t.Fatalf("expected []any, got %T", result)
+			}
+			if len(values) != len(want) {
+				t.Fatalf("expected %d values, got %d: %#v", len(want), len(values), values)
+			}
+			for i, w := range want {
+				if w == nil {
+					if values[i] != nil {
+						t.Errorf("index %d: expected nil, got %#v", i, values[i])
+					}
+					continue
+				}
+				d, ok := values[i].(duckdb.Decimal)
+				if !ok {
+					t.Fatalf("index %d: expected duckdb.Decimal, got %T", i, values[i])
+				}
+				if !equal(d.Value, big.NewInt(w.(int64))) {
+					t.Errorf("index %d: expected unscaled value %d, got %s", i, w, d.Value.String())
+				}
+			}
+		}
+
+		t.Run("list elements are scaled", func(t *testing.T) {
+			metadata := ColumnMetadata{Name: "prices", Type: "DECIMAL(10,2)[]"}
+			result, err := ConvertValue([]any{float64(19.99), "5.5", int64(400), nil}, metadata)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			assertUnscaledArray(t, result, []any{int64(1999), int64(550), int64(40000), nil})
+		})
+
+		t.Run("fixed-size array elements are scaled", func(t *testing.T) {
+			metadata := ColumnMetadata{Name: "prices", Type: "DECIMAL(4,2)[3]"}
+			result, err := ConvertValue([]any{float64(1.5), float64(2.25), float64(3)}, metadata)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			assertUnscaledArray(t, result, []any{int64(150), int64(225), int64(300)})
+		})
+
+		t.Run("NUMERIC list", func(t *testing.T) {
+			metadata := ColumnMetadata{Name: "prices", Type: "NUMERIC(10,2)[]"}
+			result, err := ConvertValue([]any{float64(19.99)}, metadata)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			assertUnscaledArray(t, result, []any{int64(1999)})
+		})
+
+		t.Run("nested list", func(t *testing.T) {
+			metadata := ColumnMetadata{Name: "prices", Type: "DECIMAL(10,2)[][]"}
+			result, err := ConvertValue([]any{[]any{float64(19.99)}, nil}, metadata)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			outer, ok := result.([]any)
+			if !ok || len(outer) != 2 || outer[1] != nil {
+				t.Fatalf("unexpected nested values: %#v", result)
+			}
+			assertUnscaledArray(t, outer[0], []any{int64(1999)})
+		})
+
+		t.Run("nil array", func(t *testing.T) {
+			metadata := ColumnMetadata{Name: "prices", Type: "DECIMAL(10,2)[]"}
+			result, err := ConvertValue(nil, metadata)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if result != nil {
+				t.Errorf("expected nil, got %v", result)
+			}
+		})
+
+		t.Run("non-array value returns error", func(t *testing.T) {
+			metadata := ColumnMetadata{Name: "prices", Type: "DECIMAL(10,2)[]"}
+			if _, err := ConvertValue(float64(19.99), metadata); err == nil {
+				t.Error("expected error for scalar value in DECIMAL list column, but got none")
+			}
+		})
+
+		t.Run("invalid element reports index and column", func(t *testing.T) {
+			metadata := ColumnMetadata{Name: "prices", Type: "DECIMAL(4,2)[]"}
+			_, err := ConvertValue([]any{float64(1), float64(400)}, metadata)
+			if err == nil || !strings.Contains(err.Error(), "index 1") || !strings.Contains(err.Error(), `column "prices"`) {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		})
 	})
 
 	t.Run("edge cases and error messages", func(t *testing.T) {
