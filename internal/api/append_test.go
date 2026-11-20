@@ -163,6 +163,55 @@ func TestAppend(t *testing.T) {
 		}
 	})
 
+	t.Run("append DECIMAL lists and arrays", func(t *testing.T) {
+		dsn := "test_append_decimal_array.db"
+		t.Cleanup(func() { os.Remove(dsn) })
+
+		_, err := Execute(ctx, dsn, ducktape.ExecuteRequest{
+			Statements: []ducktape.ExecuteStatement{
+				{Query: `CREATE TABLE test_append_decimal_array (id INTEGER, amounts DECIMAL(10,2)[], fixed DECIMAL(4,2)[3])`},
+			},
+		})
+		if err != nil {
+			t.Fatalf("failed to create table: %v", err)
+		}
+
+		ndjson := `{"rv":[1,[19.99,7043955,null],[1.5,2.25,3]]}
+{"rv":[2,["19.99","-0.5"],["1.5","2.25","3"]]}
+{"rv":[3,null,null]}`
+
+		if _, _, err := Append(ctx, dsn, "test_append_decimal_array", "main", "test_append_decimal_array", strings.NewReader(ndjson)); err != nil {
+			t.Fatalf("failed to append: %v", err)
+		}
+
+		result, err := Query(ctx, dsn, ducktape.QueryRequest{
+			Query: "SELECT amounts::VARCHAR AS amounts, fixed::VARCHAR AS fixed FROM test_append_decimal_array ORDER BY id",
+		})
+		if err != nil {
+			t.Fatalf("failed to query: %v", err)
+		}
+
+		want := []struct {
+			amounts any
+			fixed   any
+		}{
+			{"[19.99, 7043955.00, NULL]", "[1.50, 2.25, 3.00]"},
+			{"[19.99, -0.50]", "[1.50, 2.25, 3.00]"},
+			{nil, nil},
+		}
+		if len(result) != len(want) {
+			t.Fatalf("expected %d rows, got %d", len(want), len(result))
+		}
+		for i, w := range want {
+			if result[i]["amounts"] != w.amounts {
+				t.Errorf("row %d: expected amounts=%v, got %v", i+1, w.amounts, result[i]["amounts"])
+			}
+			if result[i]["fixed"] != w.fixed {
+				t.Errorf("row %d: expected fixed=%v, got %v", i+1, w.fixed, result[i]["fixed"])
+			}
+		}
+	})
+
 	t.Run("append with empty lines", func(t *testing.T) {
 		dsn := "test_append_empty_lines.db"
 		t.Cleanup(func() { os.Remove(dsn) })

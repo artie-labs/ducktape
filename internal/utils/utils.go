@@ -202,6 +202,24 @@ func ConvertValue(value any, columnMetadata ColumnMetadata) (driver.Value, error
 	default:
 		// Handle parameterized types like DECIMAL(15,2), NUMERIC(10,0)
 		if strings.HasPrefix(metadataType, "DECIMAL") || strings.HasPrefix(metadataType, "NUMERIC") {
+			// Lists (DECIMAL(10,2)[]) and arrays (DECIMAL(10,2)[3]) need each element scaled: the
+			// driver writes raw numbers as unscaled integers here too, so [19.99] would be stored as [0.19].
+			if elementType, ok := arrayElementType(metadataType); ok {
+				values, ok := value.([]any)
+				if !ok {
+					return nil, fmt.Errorf("expected %s array for column %q, got %T", elementType, columnMetadata.Name, value)
+				}
+				elementMetadata := ColumnMetadata{Name: columnMetadata.Name, Type: elementType}
+				convertedValues := make([]any, len(values))
+				for i, value := range values {
+					castedValue, err := ConvertValue(value, elementMetadata)
+					if err != nil {
+						return nil, fmt.Errorf("failed to convert value at index %d: %w", i, err)
+					}
+					convertedValues[i] = castedValue
+				}
+				return convertedValues, nil
+			}
 			if s, ok := decimalText(value); ok {
 				width, scale, err := parseDecimalType(metadataType)
 				if err != nil {
@@ -246,6 +264,19 @@ func decimalText(value any) (string, bool) {
 	}
 }
 
+// arrayElementType strips one trailing list ("[]") or array ("[3]") suffix from a type, so
+// "DECIMAL(10,2)[]" becomes "DECIMAL(10,2)" and "DECIMAL(10,2)[][]" becomes "DECIMAL(10,2)[]".
+func arrayElementType(typ string) (string, bool) {
+	if !strings.HasSuffix(typ, "]") {
+		return "", false
+	}
+	start := strings.LastIndexByte(typ, '[')
+	if start == -1 {
+		return "", false
+	}
+	return typ[:start], true
+}
+
 func parseDecimalType(typ string) (width uint8, scale uint8, err error) {
 	start := strings.IndexByte(typ, '(')
 	end := strings.IndexByte(typ, ')')
@@ -275,6 +306,11 @@ func parseDecimalString(s string, scale uint8) (*big.Int, error) {
 	var fracPart string
 	if len(parts) == 2 {
 		fracPart = parts[1]
+	}
+
+	// Without this, padding the fraction turns "", "." and "-" into a valid-looking zero.
+	if strings.TrimLeft(intPart, "+-") == "" && fracPart == "" {
+		return nil, fmt.Errorf("value %q has no digits", s)
 	}
 
 	if len(fracPart) < int(scale) {
