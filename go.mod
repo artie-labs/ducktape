@@ -8,7 +8,7 @@ require (
 	github.com/databricks/zerobus-sdk/go v1.8.0
 	github.com/duckdb/duckdb-go/v2 v2.10505.0
 	github.com/json-iterator/go v1.1.12
-	golang.org/x/net v0.62.0
+	golang.org/x/net v0.63.0
 	golang.org/x/sync v0.25.0
 )
 
@@ -32,6 +32,6 @@ require (
 	github.com/pierrec/lz4/v4 v4.1.33 // indirect
 	github.com/zeebo/xxh3 v1.1.0 // indirect
 	golang.org/x/exp v0.0.0-20260112195511-716be5621a96 // indirect
-	golang.org/x/sys v0.49.0 // indirect
-	golang.org/x/text v0.43.0 // indirect
+	golang.org/x/sys v0.50.0 // indirect
+	golang.org/x/text v0.44.0 // indirect
 )
